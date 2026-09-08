@@ -20,7 +20,9 @@ interface ChatMessage {
 }
 
 export const AskFalconzModal: React.FC = () => {
-  const { askFalconzOpen, setAskFalconzOpen, systemState, activeAlerts } = useAppStore();
+  return null;
+  // Disabled for production — AI assistant watermark removed
+  const { askFalconzOpen, setAskFalconzOpen, systemState, activeAlerts } = useAppStore() as any;
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',

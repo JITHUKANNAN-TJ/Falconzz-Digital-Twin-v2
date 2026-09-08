@@ -5,7 +5,8 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export const LiveDigitalTwinPage: React.FC = () => {
-  const { systemState, history } = useAppStore();
+  const { systemState, history, theme } = useAppStore();
+  const isDark = theme === 'dark';
   if (!systemState) return null;
   const tel = systemState.telemetry;
   const dt = systemState.digital_twin;
@@ -54,14 +55,14 @@ export const LiveDigitalTwinPage: React.FC = () => {
             <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>RPM — Actual vs Expected</span>
             <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>— dashed = expected</span>
           </div>
-          <div className="h-[180px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis dataKey="actualRpm" hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={36} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }} /><Line type="monotone" dataKey="actualRpm" stroke="#0a0a0a" strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedRpm" stroke="#a3a3a3" strokeWidth={1} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
+          <div className="h-[180px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis dataKey="actualRpm" hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={36} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} /><Line type="monotone" dataKey="actualRpm" stroke={isDark ? '#fafafa' : '#0a0a0a'} strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedRpm" stroke={isDark ? '#525252' : '#a3a3a3'} strokeWidth={1} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
         </div>
         <div className="aerospace-card p-5">
           <div className="flex justify-between items-center mb-3">
             <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Temperature — Actual vs Expected</span>
             <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>— dashed = expected</span>
           </div>
-          <div className="h-[180px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={36} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }} /><Line type="monotone" dataKey="actualTemp" stroke="#0a0a0a" strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedTemp" stroke="#a3a3a3" strokeWidth={1} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
+          <div className="h-[180px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={36} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} /><Line type="monotone" dataKey="actualTemp" stroke={isDark ? '#fafafa' : '#0a0a0a'} strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedTemp" stroke={isDark ? '#525252' : '#a3a3a3'} strokeWidth={1} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
         </div>
       </div>
 

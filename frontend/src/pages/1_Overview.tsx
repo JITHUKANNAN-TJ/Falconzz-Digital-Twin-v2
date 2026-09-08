@@ -5,9 +5,10 @@ import { Quadcopter3DViewer } from '../three/Quadcopter3DViewer';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export const OverviewPage: React.FC = () => {
-  const { systemState, history, activeAlerts } = useAppStore();
+  const { systemState, history, activeAlerts, theme } = useAppStore();
   const [timeRange, setTimeRange] = useState<'30s' | '1m' | '5m'>('30s');
   const [activeTab, setActiveTab] = useState<'rpm' | 'current' | 'temperature' | 'power'>('rpm');
+  const isDark = theme === 'dark';
 
   const historySlice = useMemo(() => {
     const count = timeRange === '30s' ? 30 : 60;
@@ -191,7 +192,7 @@ export const OverviewPage: React.FC = () => {
                 contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
                 cursor={{ stroke: 'var(--border)' }}
               />
-              <Area type="monotone" dataKey={activeTab} stroke="#0a0a0a" strokeWidth={1.5} fill="#f5f5f5" fillOpacity={1} dot={false} isAnimationActive={false} />
+              <Area type="monotone" dataKey={activeTab} stroke={isDark ? '#fafafa' : '#0a0a0a'} strokeWidth={1.5} fill={isDark ? '#262626' : '#f5f5f5'} fillOpacity={1} dot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

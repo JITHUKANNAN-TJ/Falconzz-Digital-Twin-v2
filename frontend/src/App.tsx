@@ -3,7 +3,6 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { AlertDrawer } from './components/AlertDrawer';
 import { ParameterHelpModal } from './components/ParameterHelpModal';
-import { AskFalconzModal } from './components/AskFalconzModal';
 import { useAppStore } from './state/store';
 
 // Pages
@@ -75,10 +74,8 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Global Modals & Floating Assistants */}
       <AlertDrawer />
       <ParameterHelpModal />
-      <AskFalconzModal />
     </div>
   );
 };

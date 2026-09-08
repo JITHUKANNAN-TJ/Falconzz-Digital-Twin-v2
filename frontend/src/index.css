@@ -110,3 +110,21 @@
 .bg-sky-50, .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-purple-50, .bg-slate-50 { background: var(--bg) !important; }
 .border-sky-200, .border-emerald-200, .border-rose-200, .border-amber-200, .border-purple-200, .border-slate-200 { border-color: var(--border) !important; }
 .shadow-sky-600\/20, .shadow-sm { box-shadow: none !important; }
+
+/* Dark-mode legacy slate fixes — ensure text visible on dark cards */
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: var(--text) !important; }
+.dark .text-slate-600, .dark .text-slate-500 { color: var(--text-muted) !important; }
+.dark .text-slate-400, .dark .text-slate-300 { color: var(--text-faint) !important; }
+.dark .bg-white, .dark .bg-slate-50, .dark .bg-slate-100 { background: var(--card) !important; color: var(--text) !important; }
+.dark .bg-slate-900, .dark .bg-slate-950 { background: var(--card) !important; }
+.dark .border-slate-200, .dark .border-slate-800, .dark .border-slate-700 { border-color: var(--border) !important; }
+.dark .bg-slate-100\/80, .dark .bg-slate-800\/80 { background: var(--card) !important; }
+/* Wildcard fallbacks for opacity variants */
+.dark [class*="bg-slate-"], .dark [class*="bg-white/"] { background-color: var(--card) !important; }
+.dark [class*="border-slate-"] { border-color: var(--border) !important; }
+.dark [class*="bg-sky-"], .dark [class*="bg-emerald-"], .dark [class*="bg-rose-"], .dark [class*="bg-amber-"] { background: var(--card) !important; color: var(--text) !important; }
+.dark .text-slate-950, .dark .text-slate-200, .dark .text-slate-100, .dark .text-slate-50 { color: var(--text-muted) !important; }
+/* Recharts dark tooltip/axis fixes */
+.dark .recharts-cartesian-grid-horizontal line, .dark .recharts-cartesian-grid-vertical line { stroke: var(--border) !important; }
+.dark .recharts-text { fill: var(--text-faint) !important; }
+.dark .recharts-tooltip-wrapper { filter: none !important; }

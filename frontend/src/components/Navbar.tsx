@@ -1,364 +1,148 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Menu, 
-  Bell, 
-  Sun, 
-  Moon, 
-  Zap, 
-  Power, 
-  RefreshCw 
-} from 'lucide-react';
+import { Menu, Bell, Sun, Moon, Radio, Power, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../state/store';
 import { api } from '../services/api';
 
 export const Navbar: React.FC = () => {
-  const { 
-    systemState, 
-    theme, 
-    toggleTheme, 
-    toggleSidebar, 
-    activeAlerts, 
-    setAlertDrawerOpen,
-    setSource 
-  } = useAppStore();
-
-  // Connection controls state: COM PORT vs UDP
+  const { theme, toggleTheme, toggleSidebar, activeAlerts, setAlertDrawerOpen } = useAppStore();
+  const [diag, setDiag] = useState<any>(null);
+  const [isConnectedLocally, setIsConnectedLocally] = useState<boolean>(false);
   const [ports, setPorts] = useState<any[]>([]);
   const [selectedPort, setSelectedPort] = useState<string>('');
   const [baudRate, setBaudRate] = useState<number>(57600);
-  const [connProtocol, setConnProtocol] = useState<'COM_PORT' | 'UDP'>('COM_PORT');
+  const [connType, setConnType] = useState<'USB_SERIAL' | 'UDP'>('USB_SERIAL');
+  const [udpIp, setUdpIp] = useState<string>('0.0.0.0');
   const [udpPort, setUdpPort] = useState<number>(14550);
-  const [connecting, setConnecting] = useState<boolean>(false);
-  const [connError, setConnError] = useState<string | null>(null);
-  const [diag, setDiag] = useState<any>(null);
-  const [isConnectedLocally, setIsConnectedLocally] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Poll diagnostics and serial ports
   const fetchPortsAndDiag = async () => {
     try {
-      const [portsRes, diagRes] = await Promise.all([
-        api.getSerialPorts(),
-        api.getAPMDiagnostics()
-      ]);
-      if (portsRes?.ports && Array.isArray(portsRes.ports)) {
-        setPorts(portsRes.ports);
-        if (portsRes.ports.length > 0) {
-          const portNames = portsRes.ports.map((p: any) => p.port);
-          if (!selectedPort || !portNames.includes(selectedPort)) {
-            setSelectedPort(portsRes.ports[0].port);
+      const [p, d] = await Promise.all([api.getSerialPorts(), api.getAPMDiagnostics()]);
+      if (p?.ports && Array.isArray(p.ports)) {
+        setPorts(p.ports);
+        if (p.ports.length > 0) {
+          const names = p.ports.map((x: any) => x.port);
+          if (!selectedPort || !names.includes(selectedPort)) {
+            setSelectedPort(p.ports[0].port);
+            const desc = (p.ports[0].description || '').toLowerCase();
+            if (desc.includes('cp210') || desc.includes('radio') || desc.includes('3dr')) setBaudRate(57600);
           }
-        } else {
-          setSelectedPort('');
-        }
-      } else {
-        setPorts([]);
-        setSelectedPort('');
+        } else setSelectedPort('');
       }
-      if (diagRes) {
-        setDiag(diagRes);
-        if (diagRes.apm_connection === 'CONNECTED') {
-          setIsConnectedLocally(true);
-        } else if (diagRes.apm_connection === 'DISCONNECTED') {
-          setIsConnectedLocally(false);
-        }
+      if (d) {
+        setDiag(d);
+        if (d.apm_connection === 'CONNECTED') setIsConnectedLocally(true);
+        else if (d.apm_connection === 'DISCONNECTED') setIsConnectedLocally(false);
       }
-    } catch (err) {
-      // Backend polling error
-    }
+    } catch {}
   };
 
   useEffect(() => {
     fetchPortsAndDiag();
-    const interval = setInterval(fetchPortsAndDiag, 1500);
-    return () => clearInterval(interval);
+    const id = setInterval(fetchPortsAndDiag, 1500);
+    return () => clearInterval(id);
   }, [selectedPort]);
 
   const isConnected = isConnectedLocally || diag?.apm_connection === 'CONNECTED';
-  const isHeartbeatOk = diag?.heartbeat === 'RECEIVED';
-  const isSimMode = systemState?.data_source === 'SIMULATION';
+  const heartbeatOk = diag?.heartbeat === 'RECEIVED';
+  const unread = activeAlerts.length;
 
-  const handleToggleConnect = async () => {
-    if (isConnected) {
-      // Disconnect action
-      setConnecting(true);
-      setIsConnectedLocally(false);
-      setConnError(null);
-      try {
-        await api.disconnectMAVLink();
-        await api.setTelemetrySource('SIMULATION' as any);
-        await fetchPortsAndDiag();
-      } catch (err) {
-        console.error('Failed to disconnect:', err);
-      } finally {
-        setConnecting(false);
+  const handleConnect = async () => {
+    if (connType === 'USB_SERIAL' && !selectedPort) return;
+    setLoading(true);
+    try {
+      const target = connType === 'UDP' ? `udpin:${udpIp}:${udpPort}` : selectedPort;
+      const res: any = await api.connectMAVLink(target, baudRate, connType);
+      if (res?.success || res?.status === 'CONNECTED' || res?.status === 'CONNECTING') {
+        await api.setTelemetrySource('APM_MAVLINK' as any);
       }
-    } else {
-      if (connProtocol === 'COM_PORT' && !selectedPort) {
-        setConnError('NO PORT SELECTED');
-        return;
-      }
-      // Connect action
-      setConnecting(true);
-      setConnError(null);
-      try {
-        const target = connProtocol === 'UDP' ? `udpin:0.0.0.0:${udpPort}` : selectedPort;
-        const connType = connProtocol === 'UDP' ? 'UDP' : 'USB_SERIAL';
-        const res: any = await api.connectMAVLink(target, baudRate, connType);
-        if (res?.success || res?.status === 'CONNECTED' || res?.status === 'CONNECTING') {
-          setIsConnectedLocally(true);
-          await api.setTelemetrySource('APM_MAVLINK' as any);
-        } else {
-          setConnError(res?.error ? res.error.slice(0, 32) : (res?.status || 'CONNECTION FAILED'));
-          setIsConnectedLocally(false);
-        }
-        await fetchPortsAndDiag();
-      } catch (err: any) {
-        setConnError(err?.message ? err.message.slice(0, 32) : 'CONNECTION FAILED');
-        setIsConnectedLocally(false);
-      } finally {
-        setConnecting(false);
-      }
-    }
+      await fetchPortsAndDiag();
+    } catch (e) { console.error(e); }
+    setLoading(false);
   };
 
-  const unreadAlertCount = activeAlerts.length;
+  const handleDisconnect = async () => {
+    setLoading(true);
+    try {
+      await api.disconnectMAVLink();
+      await api.setTelemetrySource('SIMULATION' as any);
+      await fetchPortsAndDiag();
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
 
   return (
-    <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white sticky top-0 z-40 px-4 sm:px-6 h-[72px] flex items-center shadow-lg select-none transition-all duration-200">
-      <div className="flex items-center justify-between gap-4 w-full min-w-0">
-        {/* ========================================================
-            1. LEFT: MENU TOGGLE (☰), ALERTS (🔔), THEME (☀/🌙), BRAND
-           ======================================================== */}
+    <header className="sticky top-0 z-40 flex items-center h-14 px-3 sm:px-6 border-b select-none" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between gap-3 w-full min-w-0">
+        {/* LEFT — menu + brand + live */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Menu Button (☰) */}
-          <button
-            onClick={toggleSidebar}
-            className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 transition-all hover:scale-105 active:scale-95 shadow-xs"
-            title="Toggle Navigation Sidebar"
-          >
-            <Menu className="w-5 h-5" />
+          <button onClick={toggleSidebar} className="w-8 h-8 rounded-md flex items-center justify-center border hover:bg-neutral-50 dark:hover:bg-neutral-900" style={{ borderColor: 'var(--border)', color: 'var(--text)' }} aria-label="Toggle menu">
+            <Menu className="w-4 h-4" />
           </button>
-
-          {/* Alert Bell with unread counter */}
-          <button
-            onClick={() => setAlertDrawerOpen(true)}
-            className="relative p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 transition-all hover:scale-105 active:scale-95 shadow-xs flex items-center gap-1.5"
-            title="Open Alerts Drawer"
-          >
-            <Bell className="w-5 h-5" />
-            <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
-              unreadAlertCount > 0 
-                ? 'bg-rose-500 text-white animate-pulse shadow-xs shadow-rose-500/50' 
-                : 'bg-slate-700 text-slate-300'
-            }`}>
-              {unreadAlertCount}
+          <div className="flex items-center gap-2.5 pl-3 ml-1 border-l" style={{ borderColor: 'var(--border)' }}>
+            <div className="w-7 h-7 rounded-md bg-black dark:bg-white flex items-center justify-center">
+              <span className="text-[11px] font-bold text-white dark:text-black tracking-widest">F</span>
+            </div>
+            <span className="text-[13px] font-semibold tracking-[0.16em]" style={{ color: 'var(--text)' }}>FALCONZ</span>
+            <span className="hidden sm:inline text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>GCS</span>
+          </div>
+          <div className="hidden md:flex items-center gap-1.5 ml-4 pl-4 border-l text-xs" style={{ borderColor: 'var(--border)' }}>
+            <span className="w-2 h-2 rounded-full" style={{ background: isConnected ? (heartbeatOk ? 'var(--text)' : '#a3a3a3') : '#d4d4d4' }} />
+            <span className="font-medium tracking-wide text-xs" style={{ color: isConnected ? 'var(--text)' : 'var(--text-faint)' }}>
+              {isConnected ? (heartbeatOk ? 'LIVE' : 'LINK') : 'OFFLINE'}
             </span>
-          </button>
-
-          {/* Theme Toggle (☀ / 🌙) */}
-          <button
-            onClick={toggleTheme}
-            className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 transition-all hover:scale-105 active:scale-95 shadow-xs"
-            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-5 h-5 text-amber-400" />
-            ) : (
-              <Moon className="w-5 h-5 text-sky-300" />
-            )}
-          </button>
-
-          {/* Brand Identity */}
-          <div className="flex items-center gap-2.5 pl-2 border-l border-slate-800/80">
-            <div className="bg-sky-600 text-white p-2 rounded-xl flex items-center justify-center font-black shadow-md shadow-sky-600/30">
-              <Zap className="w-4.5 h-4.5 text-white fill-current" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm sm:text-base font-black tracking-wider text-white">FALCONZ</h1>
-                <span className="text-[9px] sm:text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-sky-950/90 text-sky-300 border border-sky-800/80 tracking-wider">
-                  QUADCOPTER GCS
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 font-mono hidden md:block">
-                4-BLDC Real-Time Monitoring & Digital Twin
-              </p>
-            </div>
           </div>
         </div>
 
-        {/* ========================================================
-            2. CENTER: HARDWARE CONNECTION [ COM PORT / UDP ] [ PORT ▼ ] [ BAUD ▼ ] [ CONNECT ]
-           ======================================================== */}
-        <div className="flex items-center gap-2.5 bg-slate-950/90 border border-slate-800/90 px-3 py-1.5 rounded-xl shadow-inner min-h-[46px] shrink-0">
-          {/* Connection Protocol Selector: COM PORT / UDP */}
-          <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs font-mono font-bold gap-1">
-            <button
-              onClick={() => setConnProtocol('COM_PORT')}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                connProtocol === 'COM_PORT' 
-                  ? 'bg-sky-600 text-white shadow-sm font-black' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-              title="Serial COM Port Direct Hardware Connection"
-            >
-              COM PORT
-            </button>
-            <button
-              onClick={() => setConnProtocol('UDP')}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                connProtocol === 'UDP' 
-                  ? 'bg-sky-600 text-white shadow-sm font-black' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-              title="UDP Network / SITL Stream (Port 14550)"
-            >
-              UDP
-            </button>
+        {/* CENTER — connect in interface */}
+        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setConnType('USB_SERIAL')} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${connType==='USB_SERIAL' ? 'bg-black dark:bg-white text-white dark:text-black' : ''}`} style={connType!=='USB_SERIAL'?{color:'var(--text-muted)'}:{}}>COM</button>
+            <button onClick={() => setConnType('UDP')} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${connType==='UDP' ? 'bg-black dark:bg-white text-white dark:text-black' : ''}`} style={connType!=='UDP'?{color:'var(--text-muted)'}:{}}>UDP</button>
           </div>
-
-          {/* PORT DROPDOWN / INPUT */}
-          {connProtocol === 'COM_PORT' ? (
-            <div className="flex items-center gap-1.5">
-              <select
-                value={selectedPort}
-                onChange={(e) => setSelectedPort(e.target.value)}
-                disabled={isConnected || connecting || ports.length === 0}
-                className="h-9 bg-slate-900 border border-slate-700 text-sky-300 text-xs font-mono font-bold rounded-lg px-3 outline-hidden focus:border-sky-500 disabled:opacity-60 max-w-[210px] truncate cursor-pointer"
-              >
-                {ports.length > 0 ? (
-                  ports.map((p) => (
-                    <option key={p.port} value={p.port}>
-                      {p.port} {p.description ? `(${p.description.slice(0, 20)})` : ''}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    No Available Ports
-                  </option>
-                )}
+          <div className="w-px h-5 mx-1" style={{ background: 'var(--border)' }} />
+          {connType === 'USB_SERIAL' ? (
+            <>
+              <select value={selectedPort} onChange={e=>setSelectedPort(e.target.value)} disabled={isConnected || loading} className="h-7 text-xs rounded-full border px-2.5 bg-transparent max-w-[150px] truncate disabled:opacity-50" style={{ borderColor:'var(--border)', color:'var(--text)' }}>
+                {ports.length>0 ? ports.map((p:any)=><option key={p.port} value={p.port}>{p.port} {p.description?`(${p.description.slice(0,18)})`:''}</option>) : <option value="" disabled>No ports</option>}
               </select>
-
-              <button
-                onClick={fetchPortsAndDiag}
-                title="Rescan Connected Telemetry Ports"
-                className="h-9 w-9 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-sky-400 border border-slate-700 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
+              <select value={baudRate} onChange={e=>setBaudRate(Number(e.target.value))} disabled={isConnected || loading} className="h-7 text-xs rounded-full border px-2 bg-transparent disabled:opacity-50" style={{ borderColor:'var(--border)', color:'var(--text-muted)' }}>
+                <option value={57600}>57600</option><option value={115200}>115200</option><option value={9600}>9600</option><option value={921600}>921600</option>
+              </select>
+              <button onClick={fetchPortsAndDiag} className="w-7 h-7 rounded-full border flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-900" style={{ borderColor:'var(--border)', color:'var(--text-faint)' }} title="Refresh ports">
+                <RefreshCw className="w-3 h-3" />
               </button>
-            </div>
+            </>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400 font-mono font-semibold">UDP PORT:</span>
-              <input
-                type="number"
-                value={udpPort}
-                onChange={(e) => setUdpPort(Number(e.target.value))}
-                disabled={isConnected || connecting}
-                placeholder="14550"
-                className="h-9 w-24 bg-slate-900 border border-slate-700 text-sky-300 text-xs font-mono font-bold rounded-lg px-2.5 outline-hidden focus:border-sky-500 disabled:opacity-50"
-              />
+            <div className="flex items-center gap-1">
+              <input value={udpIp} onChange={e=>setUdpIp(e.target.value)} disabled={isConnected||loading} placeholder="0.0.0.0" className="h-7 w-24 text-xs rounded-full border px-2.5 bg-transparent disabled:opacity-50" style={{ borderColor:'var(--border)', color:'var(--text)' }} />
+              <span style={{ color:'var(--text-faint)' }}>:</span>
+              <input type="number" value={udpPort} onChange={e=>setUdpPort(Number(e.target.value))} disabled={isConnected||loading} className="h-7 w-20 text-xs rounded-full border px-2 bg-transparent disabled:opacity-50" style={{ borderColor:'var(--border)', color:'var(--text)' }} />
             </div>
           )}
-
-          {/* BAUD RATE DROPDOWN (Shown when COM PORT) */}
-          {connProtocol === 'COM_PORT' && (
-            <select
-              value={baudRate}
-              onChange={(e) => setBaudRate(Number(e.target.value))}
-              disabled={isConnected || connecting || ports.length === 0}
-              className="h-9 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-mono rounded-lg px-3 outline-hidden focus:border-sky-500 disabled:opacity-50 cursor-pointer"
-            >
-              <option value={57600}>57600 (Telemetry Radio 433/915 MHz)</option>
-              <option value={115200}>115200 (Direct USB Standard / ESP32)</option>
-              <option value={9600}>9600 (Standard Serial 9600 / Arduino)</option>
-              <option value={38400}>38400 (Legacy Radio)</option>
-              <option value={19200}>19200</option>
-              <option value={921600}>921600 (High Speed)</option>
-            </select>
+          {isConnected ? (
+            <button onClick={handleDisconnect} disabled={loading} className="h-7 px-3 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
+              <Power className="w-3 h-3" /> Disconnect
+            </button>
+          ) : (
+            <button onClick={handleConnect} disabled={loading || (connType==='USB_SERIAL' && ports.length===0)} className="h-7 px-3 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
+              <Radio className="w-3 h-3" /> {loading ? '...' : 'Connect'}
+            </button>
           )}
-
-          {/* SINGLE CONNECT / DISCONNECT BUTTON */}
-          <button
-            onClick={handleToggleConnect}
-            disabled={connecting || (connProtocol === 'COM_PORT' && !isConnected && ports.length === 0)}
-            className={`h-9 text-xs font-bold font-mono px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-              isConnected
-                ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                : connecting
-                ? 'bg-amber-600 text-white cursor-wait'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            }`}
-          >
-            <Power className="w-3.5 h-3.5" />
-            {connecting 
-              ? (isConnected ? 'DISCONNECTING...' : 'CONNECTING...') 
-              : isConnected 
-              ? 'DISCONNECT' 
-              : 'CONNECT'}
-          </button>
-
-          {/* Connection status indicator */}
-          <div className="flex items-center gap-2 px-2 text-xs font-mono">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isConnected
-                  ? isHeartbeatOk ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50' : 'bg-sky-400 animate-pulse shadow-sm shadow-sky-400/50'
-                  : connecting
-                  ? 'bg-amber-400 animate-ping'
-                  : 'bg-slate-600'
-              }`}
-            />
-            <span className="font-bold text-slate-300 flex items-center gap-1.5">
-              {isConnected ? (
-                isHeartbeatOk ? (
-                  <span className="text-emerald-400">CONNECTED (LIVE)</span>
-                ) : diag?.radio_link?.active ? (
-                  <span className="text-sky-400 flex items-center gap-1">
-                    <span>
-                      RADIO ({diag.radio_link.rssi > 100 ? `${Math.round((diag.radio_link.rssi / 1.9) - 127)} dBm` : `${diag.radio_link.rssi} dBm`})
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-950/80 text-sky-300 border border-sky-800">
-                      {diag.radio_link.remrssi > 0 
-                        ? `AIR LINK ${diag.radio_link.remrssi > 100 ? `${Math.round((diag.radio_link.remrssi / 1.9) - 127)} dBm` : `${diag.radio_link.remrssi}%`}` 
-                        : 'AWAITING AIR LINK'}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-sky-400">{connProtocol === 'UDP' ? 'UDP LISTENING' : 'PORT OPEN (STANDBY)'}</span>
-                )
-              ) : connError ? (
-                <span className="text-rose-400 truncate max-w-[150px]" title={connError}>{connError}</span>
-              ) : (
-                <span className="text-slate-400">DISCONNECTED</span>
-              )}
-            </span>
-          </div>
         </div>
 
-        {/* ========================================================
-            3. RIGHT: TELEMETRY SOURCE TOGGLE (NO EMERGENCY STOP)
-           ======================================================== */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Source Toggle */}
-          <div className="flex items-center gap-1.5 bg-slate-950/90 p-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-            <button
-              onClick={() => setSource('APM_MAVLINK')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                !isSimMode ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              APM HARDWARE
-            </button>
-            <button
-              onClick={() => setSource('SIMULATION')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                isSimMode ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              TESTBED SIM
-            </button>
-          </div>
+        {/* RIGHT */}
+        <div className="flex items-center gap-2 shrink-0">
+          <a href="#hardware" onClick={e=>{e.preventDefault(); document.dispatchEvent(new CustomEvent('falconz:navigate',{detail:'hardware-center'}));}} className="lg:hidden text-[11px] px-2.5 py-1 rounded-full border lg:hidden" style={{ borderColor:'var(--border)', color:'var(--text-muted)'}}>
+            Connect
+          </a>
+          <button onClick={() => setAlertDrawerOpen(true)} className="relative w-8 h-8 rounded-md flex items-center justify-center border hover:bg-neutral-50 dark:hover:bg-neutral-900" style={{ borderColor:'var(--border)', color:'var(--text-muted)'}} aria-label="Alerts">
+            <Bell className="w-4 h-4" />
+            {unread>0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium flex items-center justify-center">{unread}</span>}
+          </button>
+          <button onClick={toggleTheme} className="w-8 h-8 rounded-md flex items-center justify-center border hover:bg-neutral-50 dark:hover:bg-neutral-900" style={{ borderColor:'var(--border)', color:'var(--text-muted)'}} aria-label="Toggle theme">
+            {theme==='dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
         </div>
       </div>
     </header>

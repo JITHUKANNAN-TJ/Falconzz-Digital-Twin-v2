@@ -3,496 +3,543 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useAppStore } from '../state/store';
-import { Cpu, RotateCcw, Move, Compass, Shield, Navigation } from 'lucide-react';
+import { Cpu, RotateCcw } from 'lucide-react';
 
 export const Quadcopter3DViewer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const { systemState, theme } = useAppStore();
 
-  // Keep references to live motor & attitude telemetry for the animation loop
   const telemetryRef = useRef({
-    m1Rpm: 0,
-    m2Rpm: 0,
-    m3Rpm: 0,
-    m4Rpm: 0,
-    m1Status: 'GRAY',
-    m2Status: 'GRAY',
-    m3Status: 'GRAY',
-    m4Status: 'GRAY',
-    rollDeg: 0,
-    pitchDeg: 0,
-    yawDeg: 0,
+    m1Rpm: 0, m2Rpm: 0, m3Rpm: 0, m4Rpm: 0,
+    m1Status: 'GRAY', m2Status: 'GRAY', m3Status: 'GRAY', m4Status: 'GRAY',
+    rollDeg: 0, pitchDeg: 0, yawDeg: 0,
     hasRealAttitude: false,
-    flightMode: 'STABILIZE',
-    isArmed: false,
-    sats: 0,
-    heartbeat: false,
-    isConnected: false
+    flightMode: 'STABILIZE', isArmed: false, heartbeat: false, isConnected: false,
+    vib: 0.05, temp: 25
   });
 
   useEffect(() => {
-    if (systemState) {
-      const tel = systemState.telemetry;
-      const motors = tel.motors || {};
-      const isConn = tel.connection_status === 'CONNECTED' || tel.source_type === 'SIMULATION';
-      const hb = !!tel.heartbeat_received;
-
-      const getStatusColor = (mId: 'motor_1' | 'motor_2' | 'motor_3' | 'motor_4') => {
-        const m = motors[mId];
-        if (m && m.is_connected === false) return 'DISCONNECTED';
-        if (!isConn && tel.source_type === 'APM_MAVLINK') return 'GRAY';
-        if (m?.temperature_c && m.temperature_c > 75) return 'RED';
-        if (m?.vibration_rms_g && m.vibration_rms_g > 0.45) return 'RED';
-        if (mId === 'motor_3' && tel.rpm_imbalance_pct && tel.rpm_imbalance_pct > 15) return 'AMBER';
-        if (m?.temperature_c && m.temperature_c > 60) return 'AMBER';
-        if (isConn) return 'GREEN';
-        return 'GRAY';
-      };
-
-      const hasAttitude = (tel.roll_deg !== undefined && tel.pitch_deg !== undefined && isConn && (tel.roll_deg !== 0 || tel.pitch_deg !== 0 || tel.yaw_deg !== 0));
-
-      const getMotorRpm = (mId: 'motor_1' | 'motor_2' | 'motor_3' | 'motor_4') => {
-        const m = motors[mId];
-        if (!isConn) return 0;
-        if (!m || m.is_connected === false || m.connection_status === 'DISCONNECTED') return 0;
-        return m.live_rpm ?? 0;
-      };
-
-      telemetryRef.current = {
-        m1Rpm: getMotorRpm('motor_1'),
-        m2Rpm: getMotorRpm('motor_2'),
-        m3Rpm: getMotorRpm('motor_3'),
-        m4Rpm: getMotorRpm('motor_4'),
-        m1Status: getStatusColor('motor_1'),
-        m2Status: getStatusColor('motor_2'),
-        m3Status: getStatusColor('motor_3'),
-        m4Status: getStatusColor('motor_4'),
-        rollDeg: tel.roll_deg || 0,
-        pitchDeg: tel.pitch_deg || 0,
-        yawDeg: tel.yaw_deg || 0,
-        hasRealAttitude: !!hasAttitude,
-        flightMode: tel.flight_mode || 'STABILIZE',
-        isArmed: !!tel.is_armed,
-        sats: tel.satellites_visible || 0,
-        heartbeat: hb,
-        isConnected: isConn
-      };
-    }
+    if (!systemState) return;
+    const tel = systemState.telemetry;
+    const motors = tel.motors || {};
+    const isConn = tel.connection_status === 'CONNECTED' || tel.source_type === 'SIMULATION';
+    const hb = !!tel.heartbeat_received;
+    const getStatus = (mId: 'motor_1' | 'motor_2' | 'motor_3' | 'motor_4') => {
+      const m = motors[mId];
+      if (m && m.is_connected === false) return 'DISCONNECTED';
+      if (!isConn && tel.source_type === 'APM_MAVLINK') return 'GRAY';
+      if (m?.temperature_c && m.temperature_c > 75) return 'RED';
+      if (m?.vibration_rms_g && m.vibration_rms_g > 0.45) return 'RED';
+      if (mId === 'motor_3' && tel.rpm_imbalance_pct && tel.rpm_imbalance_pct > 15) return 'AMBER';
+      if (m?.temperature_c && m.temperature_c > 60) return 'AMBER';
+      if (isConn) return 'GREEN';
+      return 'GRAY';
+    };
+    // For realistic demo, treat any connected state as having attitude if SIM provides it, else hardware
+    const hasAttitude = isConn && tel.roll_deg !== undefined && tel.pitch_deg !== undefined;
+    const getRpm = (mId: 'motor_1' | 'motor_2' | 'motor_3' | 'motor_4') => {
+      const m = motors[mId];
+      if (!isConn) return 0;
+      if (!m || m.is_connected === false || m.connection_status === 'DISCONNECTED') return 0;
+      return m.live_rpm ?? 0;
+    };
+    telemetryRef.current = {
+      m1Rpm: getRpm('motor_1'), m2Rpm: getRpm('motor_2'), m3Rpm: getRpm('motor_3'), m4Rpm: getRpm('motor_4'),
+      m1Status: getStatus('motor_1'), m2Status: getStatus('motor_2'), m3Status: getStatus('motor_3'), m4Status: getStatus('motor_4'),
+      rollDeg: tel.roll_deg || 0, pitchDeg: tel.pitch_deg || 0, yawDeg: tel.yaw_deg || 0,
+      hasRealAttitude: !!hasAttitude, flightMode: tel.flight_mode || 'STABILIZE', isArmed: !!tel.is_armed,
+      heartbeat: hb, isConnected: isConn, vib: tel.vibration_rms_g ?? 0.05, temp: tel.temperature_c ?? 25
+    };
   }, [systemState]);
 
   useEffect(() => {
     if (!containerRef.current) return;
-
     const container = containerRef.current;
-    const width = container.clientWidth || 600;
+    const width = container.clientWidth || 640;
     const height = container.clientHeight || 480;
-
     const isDark = theme === 'dark';
 
-    // 1. Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDark ? 0x090d16 : 0xf8fafc);
+    scene.background = new THREE.Color(isDark ? 0x0a0a0a : 0xf8fafc);
+    scene.fog = new THREE.Fog(isDark ? 0x0a0a0a : 0xf8fafc, 8, 18);
 
-    // Optimized camera distance and field of view for high visibility of full F450 assembly
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(0, 3.4, 4.8);
-    camera.lookAt(0, 0, 0);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+    camera.position.set(0, 2.9, 4.2);
+    camera.lookAt(0, 0.05, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = isDark ? 1.05 : 1.15;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // Orbit Controls for 360-degree interactive mouse/touch rotation
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.15; // Don't go below ground
-    controls.minDistance = 2.0;
-    controls.maxDistance = 12.0;
-    controls.target.set(0, 0, 0);
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.minDistance = 1.8;
+    controls.maxDistance = 9;
+    controls.target.set(0, 0.05, 0);
     controlsRef.current = controls;
 
-    // 2. Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.7 : 0.9);
-    scene.add(ambientLight);
+    // ——— Lights: realistic studio ———
+    const ambient = new THREE.AmbientLight(0xffffff, isDark ? 0.55 : 0.75);
+    scene.add(ambient);
+    const hemi = new THREE.HemisphereLight(0xffffff, isDark ? 0x222222 : 0x444444, isDark ? 0.5 : 0.7);
+    hemi.position.set(0, 8, 0);
+    scene.add(hemi);
+    const keyLight = new THREE.DirectionalLight(0xffffff, isDark ? 1.1 : 1.35);
+    keyLight.position.set(5, 9, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.camera.left = -6; keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 6; keyLight.shadow.camera.bottom = -6;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(isDark ? 0x8ab4f8 : 0xfff4e0, isDark ? 0.35 : 0.5);
+    fillLight.position.set(-6, 4, -4);
+    scene.add(fillLight);
+    const rimLight = new THREE.PointLight(isDark ? 0x8ab4f8 : 0xffffff, 0.6, 12);
+    rimLight.position.set(0, 2.5, 0);
+    scene.add(rimLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, isDark ? 1.0 : 1.2);
-    dirLight.position.set(6, 10, 6);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
-
-    const cyanPoint = new THREE.PointLight(0x0ea5e9, 0.8, 12);
-    cyanPoint.position.set(0, 3, 0);
-    scene.add(cyanPoint);
-
-    // 3. Grid Helper
-    const gridHelper = new THREE.GridHelper(
-      10, 
-      20, 
-      isDark ? 0x0284c7 : 0x0284c7, 
-      isDark ? 0x1e293b : 0xe2e8f0
-    );
-    gridHelper.position.y = -0.28;
+    // Ground + shadow catcher
+    const groundGeo = new THREE.PlaneGeometry(14, 14);
+    const groundMat = new THREE.ShadowMaterial({ opacity: isDark ? 0.18 : 0.12 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.32;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    const gridHelper = new THREE.GridHelper(10, 20, isDark ? 0x333333 : 0xd4d4d4, isDark ? 0x1a1a1a : 0xeeeeee);
+    gridHelper.position.y = -0.315;
     scene.add(gridHelper);
 
-    // 4. Drone Master Group
     const droneGroup = new THREE.Group();
     scene.add(droneGroup);
 
-    // Materials
-    const carbonMat = new THREE.MeshStandardMaterial({
-      color: isDark ? 0x1e293b : 0x334155,
-      roughness: 0.3,
-      metalness: 0.8
-    });
-    const frameCenterMat = new THREE.MeshStandardMaterial({
-      color: isDark ? 0x0f172a : 0x1e293b,
-      roughness: 0.2,
-      metalness: 0.9
-    });
-    const motorStatorBaseMat = new THREE.MeshStandardMaterial({
-      color: 0x475569,
-      roughness: 0.4,
-      metalness: 0.7
-    });
-    const propBladeMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.2,
-      metalness: 0.3
-    });
-    const batteryMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Amber LiPo pack
-      roughness: 0.5
-    });
-    const apmMat = new THREE.MeshStandardMaterial({
-      color: 0x0369a1, // APM Blue enclosure
-      roughness: 0.3,
-      metalness: 0.5
-    });
+    // ——— Realistic PBR materials ———
+    const carbonMat = new THREE.MeshStandardMaterial({ color: 0x1e242e, roughness: 0.55, metalness: 0.15 });
+    const centerPlateMat = new THREE.MeshStandardMaterial({ color: 0x0f1419, roughness: 0.35, metalness: 0.4 });
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x1e242e, roughness: 0.5, metalness: 0.12 });
+    const motorBellMat = new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.28, metalness: 0.75 });
+    const motorBaseMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.35, metalness: 0.85 });
+    const copperMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.3, metalness: 0.6, emissive: 0x7c2d12, emissiveIntensity: isDark ? 0.06 : 0 });
+    const propMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.45, metalness: 0.05 });
+    const propHubMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.4, metalness: 0.6 });
+    const escMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6, metalness: 0.1 });
+    const escLabelMat = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.8 });
+    const batteryMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.5, metalness: 0.1 });
+    const batteryLabelMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.7 });
+    const apmBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e40af, roughness: 0.35, metalness: 0.25 });
+    const apmPortMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.2, metalness: 0.9 });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.6, metalness: 0.05 });
+    const footMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 });
+    const gpsMastMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.4, metalness: 0.6 });
+    const gpsPuckMat = new THREE.MeshStandardMaterial({ color: 0xf9fafb, roughness: 0.3, metalness: 0.05 });
+    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 });
 
-    // Authentic DJI F450 CAD Airframe (Converted from Autodesk Inventor STEP AP214)
+    // ——— Try load detailed F450 GLB, fallback to procedural frame ———
+    let glbLoaded = false;
     const gltfLoader = new GLTFLoader();
-    gltfLoader.load(
-      '/models/f450_frame.glb',
-      (gltf) => {
-        const cadModel = gltf.scene;
-        cadModel.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+    gltfLoader.load('/models/f450_frame.glb', (gltf) => {
+      glbLoaded = true;
+      const cad = gltf.scene;
+      cad.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const m = child as THREE.Mesh;
+          m.castShadow = true; m.receiveShadow = true;
+          // Enhance carbon look: darken and add slight metalness
+          if (m.material && (m.material as any).color) {
+            const mat = m.material as THREE.MeshStandardMaterial;
+            if (mat.color.getHex() === 0xffffff || mat.color.getHex() === 0xfafafa) {
+              mat.color.setHex(0x1e242e);
+              mat.roughness = 0.55; mat.metalness = 0.12;
+            }
           }
-        });
-        droneGroup.add(cadModel);
-      },
-      undefined,
-      (err) => {
-        console.warn('F450 CAD model loading failed:', err);
+        }
+      });
+      // slight scale normalize and center
+      const box = new THREE.Box3().setFromObject(cad);
+      const center = box.getCenter(new THREE.Vector3());
+      cad.position.sub(center);
+      cad.position.y += 0.05;
+      droneGroup.add(cad);
+    }, undefined, () => { glbLoaded = false; });
+
+    // ——— Procedural fallback frame (always present underneath, GLB sits on top; if GLB fails, this is visible) ———
+    if (true) {
+      const plateTop = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.02, 0.62), centerPlateMat);
+      plateTop.position.y = 0.06; plateTop.castShadow = true; plateTop.receiveShadow = true; droneGroup.add(plateTop);
+      const plateBottom = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.02, 0.62), centerPlateMat);
+      plateBottom.position.y = -0.06; plateBottom.castShadow = true; droneGroup.add(plateBottom);
+      // Arms — 4 rectangular + circular tube
+      const armPositions = [
+        { x: 0.62, z: -0.62 }, { x: -0.62, z: 0.62 }, { x: -0.62, z: -0.62 }, { x: 0.62, z: 0.62 }
+      ];
+      armPositions.forEach((p) => {
+        const len = Math.sqrt(p.x*p.x + p.z*p.z);
+        const ang = Math.atan2(p.z, p.x);
+        const armGeo = new THREE.BoxGeometry(len + 0.18, 0.02, 0.045);
+        const arm = new THREE.Mesh(armGeo, armMat);
+        arm.position.set(p.x*0.48, 0, p.z*0.48);
+        arm.rotation.y = -ang;
+        arm.castShadow = true; arm.receiveShadow = true;
+        droneGroup.add(arm);
+        // ESC under arm
+        const esc = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.042), escMat);
+        esc.position.set(p.x*0.32, -0.02, p.z*0.32);
+        esc.rotation.y = -ang;
+        esc.castShadow = true; droneGroup.add(esc);
+        const escLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.014), escLabelMat);
+        escLabel.position.set(p.x*0.32, -0.013, p.z*0.32);
+        escLabel.rotation.x = -Math.PI/2; escLabel.rotation.z = -ang;
+        droneGroup.add(escLabel);
+        // Wiring along arm
+        const wireCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0.05*Math.sign(p.x), -0.04, 0.05*Math.sign(p.z)),
+          new THREE.Vector3(p.x*0.25, -0.04, p.z*0.25),
+          new THREE.Vector3(p.x*0.55, -0.02, p.z*0.55)
+        ]);
+        const wireGeo = new THREE.TubeGeometry(wireCurve, 8, 0.004, 6, false);
+        const wireMat = new THREE.MeshStandardMaterial({ color: p.x > 0 ? 0xef4444 : 0x111827, roughness: 0.8 });
+        const wire = new THREE.Mesh(wireGeo, wireMat);
+        droneGroup.add(wire);
+      });
+      // Center screws
+      for (let i = 0; i < 4; i++) {
+        const sx = (i % 2 === 0 ? 0.24 : -0.24);
+        const sz = (i < 2 ? 0.24 : -0.24);
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.025, 8), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.9, roughness: 0.2 }));
+        screw.position.set(sx, 0.075, sz); droneGroup.add(screw);
       }
-    );
+      // PDB circular
+      const pdb = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.006, 24), new THREE.MeshStandardMaterial({ color: 0x065f46, roughness: 0.6 }));
+      pdb.position.y = 0.01; droneGroup.add(pdb);
+    }
 
-    // APM Flight Controller Enclosure (Mounted securely on Top Plate)
-    const apmGeo = new THREE.BoxGeometry(0.44, 0.09, 0.44);
-    const apmMesh = new THREE.Mesh(apmGeo, apmMat);
-    apmMesh.position.y = 0.22;
-    apmMesh.castShadow = true;
-    droneGroup.add(apmMesh);
-
-    // APM Telemetry Status LED
-    const ledGeo = new THREE.SphereGeometry(0.035, 16, 16);
-    const ledMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-    const ledMesh = new THREE.Mesh(ledGeo, ledMat);
-    ledMesh.position.set(0.12, 0.27, 0.12);
-    droneGroup.add(ledMesh);
-
-    // 3S LiPo Battery Pack (Slotted directly under Bottom Plate)
-    const battGeo = new THREE.BoxGeometry(0.42, 0.18, 0.78);
-    const battMesh = new THREE.Mesh(battGeo, batteryMat);
-    battMesh.position.y = -0.16;
-    battMesh.castShadow = true;
-    droneGroup.add(battMesh);
-
-    // 4 Motor Positions (Aligned exactly with CAD Arm Motor Mount Pads)
-    const armPositions = [
-      { id: 'm1', label: 'M1 (Front-Right)', x: 1.251, y: 0.124, z: -1.284 },
-      { id: 'm2', label: 'M2 (Rear-Left)', x: -1.163, y: 0.124, z: 1.343 },
-      { id: 'm3', label: 'M3 (Front-Left)', x: -1.296, y: 0.124, z: -1.216 },
-      { id: 'm4', label: 'M4 (Rear-Right)', x: 1.278, y: 0.124, z: 1.247 }
+    // ——— Landing gear — realistic X skid ———
+    const skidY = -0.28;
+    const skidLegs = [
+      { x: 0.22, z: 0.22, hx: 0.22, hz: 0.05 }, { x: -0.22, z: 0.22, hx: -0.22, hz: 0.05 },
+      { x: 0.22, z: -0.22, hx: 0.22, hz: -0.05 }, { x: -0.22, z: -0.22, hx: -0.22, hz: -0.05 }
     ];
+    skidLegs.forEach(p => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.22, 8), legMat);
+      leg.position.set(p.x, -0.16, p.z);
+      leg.castShadow = true; droneGroup.add(leg);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.006, 12), footMat);
+      foot.position.set(p.x, skidY + 0.003, p.z); droneGroup.add(foot);
+    });
+    // Skids horizontal
+    const skidBarGeo = new THREE.BoxGeometry(0.58, 0.012, 0.012);
+    const skidBar1 = new THREE.Mesh(skidBarGeo, legMat); skidBar1.position.set(0, skidY, 0.22); droneGroup.add(skidBar1);
+    const skidBar2 = new THREE.Mesh(skidBarGeo, legMat); skidBar2.position.set(0, skidY, -0.22); droneGroup.add(skidBar2);
 
-    // Motor Hubs & Propellers Groups
+    // ——— APM stack ———
+    const apm = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.075, 0.44), apmBodyMat);
+    apm.position.y = 0.115; apm.castShadow = true; apm.receiveShadow = true; droneGroup.add(apm);
+    const apmTopLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.05), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
+    apmTopLabel.rotation.x = -Math.PI/2; apmTopLabel.position.set(0, 0.153, 0); droneGroup.add(apmTopLabel);
+    // Ports
+    const usbPort = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.018, 0.012), apmPortMat);
+    usbPort.position.set(0.18, 0.115, 0.22); droneGroup.add(usbPort);
+    const telemPort = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.01), apmPortMat);
+    telemPort.position.set(-0.18, 0.115, 0.22); droneGroup.add(telemPort);
+    // LED
+    const ledGeo = new THREE.SphereGeometry(0.018, 12, 12);
+    const ledMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.9 });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.set(0.14, 0.158, 0.14); droneGroup.add(led);
+    const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 10), new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, emissiveIntensity: 0.7 }));
+    led2.position.set(0.14, 0.158, 0.10); droneGroup.add(led2);
+
+    // ——— Battery ———
+    const batt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.80), batteryMat);
+    batt.position.y = -0.14; batt.castShadow = true; droneGroup.add(batt);
+    const battStrap1 = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.012, 0.04), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 }));
+    battStrap1.position.set(0, -0.10, 0.18); droneGroup.add(battStrap1);
+    const battStrap2 = battStrap1.clone(); battStrap2.position.set(0, -0.10, -0.18); droneGroup.add(battStrap2);
+    const battLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.05), batteryLabelMat);
+    battLabel.rotation.x = Math.PI/2; battLabel.position.set(0, -0.22, 0); // bottom
+    droneGroup.add(battLabel);
+    // XT60 connector + wires
+    const xt60 = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.02), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 }));
+    xt60.position.set(0.23, -0.12, 0); droneGroup.add(xt60);
+    const battWireCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(0.21, -0.12, 0), new THREE.Vector3(0.28, -0.09, 0), new THREE.Vector3(0.32, -0.04, 0)]);
+    const battWire1 = new THREE.Mesh(new THREE.TubeGeometry(battWireCurve, 6, 0.005, 6, false), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+    const battWire2 = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0.21, -0.12, 0.012), new THREE.Vector3(0.28, -0.09, 0.012), new THREE.Vector3(0.32, -0.04, 0.012)]), 6, 0.005, 6, false), new THREE.MeshStandardMaterial({ color: 0x111827 }));
+    droneGroup.add(battWire1); droneGroup.add(battWire2);
+
+    // ——— GPS mast ———
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.22, 8), gpsMastMat);
+    mast.position.set(-0.14, 0.22, -0.14); droneGroup.add(mast);
+    const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.012, 16), gpsPuckMat);
+    puck.position.set(-0.14, 0.33, -0.14); puck.castShadow = true; droneGroup.add(puck);
+    // Antenna 915MHz
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.28, 6), antennaMat);
+    ant.position.set(0.20, 0.18, -0.18); ant.rotation.z = 0.12; droneGroup.add(ant);
+    const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 8), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+    antTip.position.set(0.22, 0.32, -0.18); droneGroup.add(antTip);
+
+    // ——— Motors ———
+    const armPositions = [
+      { id: 'm1', x: 1.251, z: -1.284, cw: true }, { id: 'm2', x: -1.163, z: 1.343, cw: true },
+      { id: 'm3', x: -1.296, z: -1.216, cw: false }, { id: 'm4', x: 1.278, z: 1.247, cw: false }
+    ];
     const motorStatusMeshes: Record<string, THREE.Mesh> = {};
     const propGroups: Record<string, THREE.Group> = {};
+    const blurDiscs: Record<string, THREE.Mesh> = {};
 
     armPositions.forEach((arm) => {
-      const motorBase = new THREE.Group();
-      motorBase.position.set(arm.x, arm.y, arm.z);
-      droneGroup.add(motorBase);
+      const base = new THREE.Group();
+      base.position.set(arm.x, 0.068, arm.z);
+      droneGroup.add(base);
 
-      // A2212 Brushless Motor Stator Housing
-      const statorGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.22, 24);
-      const statorMesh = new THREE.Mesh(statorGeo, motorStatorBaseMat);
-      statorMesh.position.y = 0.11;
-      statorMesh.castShadow = true;
-      motorBase.add(statorMesh);
+      // Motor mount
+      const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.012, 16), new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.7, roughness: 0.3 }));
+      mount.position.y = 0.01; mount.castShadow = true; base.add(mount);
 
-      // Status Halo / Glow Ring under motor mount
-      const haloGeo = new THREE.TorusGeometry(0.23, 0.035, 16, 32);
-      const haloMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
-      haloMesh.rotation.x = Math.PI / 2;
-      haloMesh.position.y = 0.01;
-      motorBase.add(haloMesh);
-      motorStatusMeshes[arm.id] = haloMesh;
+      // Stator base
+      const stator = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.085, 24), motorBaseMat);
+      stator.position.y = 0.055; stator.castShadow = true; base.add(stator);
+      // Windings copper ring
+      const winding = new THREE.Mesh(new THREE.TorusGeometry(0.082, 0.018, 10, 20), copperMat);
+      winding.rotation.x = Math.PI/2; winding.position.y = 0.06; base.add(winding);
+      // Bell
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.105, 0.075, 24), motorBellMat);
+      bell.position.y = 0.125; bell.castShadow = true; base.add(bell);
+      // Shaft
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.9, roughness: 0.15 }));
+      shaft.position.y = 0.175; base.add(shaft);
+      // Prop adapter
+      const adapter = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.01, 12), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.4, roughness: 0.5 }));
+      adapter.position.y = 0.185; base.add(adapter);
 
-      // Rotating Propeller Group
+      // Halo ring
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.009, 10, 28), new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.0, transparent: true, opacity: 0.9 }));
+      halo.rotation.x = Math.PI/2; halo.position.y = 0.008; base.add(halo);
+      motorStatusMeshes[arm.id] = halo as any;
+
+      // Prop group at shaft top
       const propGroup = new THREE.Group();
-      propGroup.position.y = 0.23;
-      motorBase.add(propGroup);
+      propGroup.position.y = 0.195;
+      base.add(propGroup);
       propGroups[arm.id] = propGroup;
 
-      // Propeller Hub
-      const pHubGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.06, 16);
-      const pHub = new THREE.Mesh(pHubGeo, frameCenterMat);
-      pHub.castShadow = true;
-      propGroup.add(pHub);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.014, 16), propHubMat);
+      hub.castShadow = true; propGroup.add(hub);
+      const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.012, 8), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.8, roughness: 0.3 }));
+      nut.position.y = 0.012; propGroup.add(nut);
 
-      // 2-Blade 1045 Aerodynamic Propeller
-      const bladeGeo = new THREE.BoxGeometry(1.20, 0.015, 0.10);
-      const blade = new THREE.Mesh(bladeGeo, propBladeMat);
-      blade.position.y = 0.03;
-      blade.castShadow = true;
-      propGroup.add(blade);
+      // Realistic 1045 prop — two blades with slight twist via two boxes + tip rounding
+      const bladeShape: THREE.Mesh[] = [];
+      [0, Math.PI].forEach((ang) => {
+        const bladeGroup = new THREE.Group();
+        bladeGroup.rotation.y = ang;
+        // Main blade
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.008, 0.052), propMat);
+        blade.position.set(0.29, 0.006, 0);
+        blade.rotation.z = 0.18; // twist
+        blade.rotation.y = 0.08;
+        blade.castShadow = true;
+        bladeGroup.add(blade);
+        // Tip
+        const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.014, 0.006, 8), propMat);
+        tip.rotation.x = Math.PI/2; tip.rotation.z = 0.18;
+        tip.position.set(0.57, 0.006, 0);
+        bladeGroup.add(tip);
+        propGroup.add(bladeGroup);
+        bladeShape.push(blade);
+      });
+
+      // Blur disc — shown when rpm > 1200
+      const blurGeo = new THREE.CircleGeometry(0.58, 32);
+      const blurMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+      const blur = new THREE.Mesh(blurGeo, blurMat);
+      blur.rotation.x = Math.PI/2; blur.position.y = 0.008;
+      propGroup.add(blur);
+      blurDiscs[arm.id] = blur;
     });
 
-    // Target rotation angles for smooth interpolation
-    const currentEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-
-    // Animation Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const dt = clock.getDelta();
       const now = clock.getElapsedTime();
-      const tState = telemetryRef.current;
+      const t = telemetryRef.current;
 
-      // Update Motor Status Colors (Green, Amber, Red, Gray, Disconnected)
-      const colorMap: Record<string, number> = {
-        GREEN: 0x10b981,
-        AMBER: 0xf59e0b,
-        RED: 0xef4444,
-        GRAY: 0x64748b,
-        DISCONNECTED: 0x334155
+      const colorMap: Record<string, { color: number, emissive: number, intensity: number }> = {
+        GREEN: { color: 0x22c55e, emissive: 0x22c55e, intensity: 1.0 },
+        AMBER: { color: 0xf59e0b, emissive: 0xf59e0b, intensity: 0.9 },
+        RED: { color: 0xef4444, emissive: 0xef4444, intensity: 1.0 },
+        GRAY: { color: 0x6b7280, emissive: 0x6b7280, intensity: 0.0 },
+        DISCONNECTED: { color: 0x4b5563, emissive: 0x000000, intensity: 0.0 }
       };
+      (['m1','m2','m3','m4'] as const).forEach(k => {
+        const mesh = motorStatusMeshes[k];
+        const status = (t as any)[`${k}Status`] as string;
+        const cfg = colorMap[status] ?? colorMap.GRAY;
+        if (mesh) {
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          mat.color.setHex(cfg.color);
+          (mat as any).emissive.setHex(cfg.emissive);
+          mat.emissiveIntensity = cfg.intensity * (0.7 + 0.3*Math.sin(now*3 + (k==='m1'?0: k==='m2'?1: k==='m3'?2:3)));
+          mat.opacity = status==='DISCONNECTED' ? 0.25 : 0.95;
+        }
+      });
 
-      if (motorStatusMeshes['m1']) (motorStatusMeshes['m1'].material as THREE.MeshBasicMaterial).color.setHex(colorMap[tState.m1Status] ?? 0x10b981);
-      if (motorStatusMeshes['m2']) (motorStatusMeshes['m2'].material as THREE.MeshBasicMaterial).color.setHex(colorMap[tState.m2Status] ?? 0x10b981);
-      if (motorStatusMeshes['m3']) (motorStatusMeshes['m3'].material as THREE.MeshBasicMaterial).color.setHex(colorMap[tState.m3Status] ?? 0x10b981);
-      if (motorStatusMeshes['m4']) (motorStatusMeshes['m4'].material as THREE.MeshBasicMaterial).color.setHex(colorMap[tState.m4Status] ?? 0x10b981);
+      // Props + blur
+      const rpmMap: Record<string, number> = { m1: t.m1Rpm, m2: t.m2Rpm, m3: t.m3Rpm, m4: t.m4Rpm };
+      (['m1','m2','m3','m4'] as const).forEach(k => {
+        const rpm = rpmMap[k];
+        const grp = propGroups[k];
+        const blur = blurDiscs[k];
+        if (!grp || !blur) return;
+        const isCCW = k==='m3' || k==='m4';
+        const dir = isCCW ? -1 : 1;
+        if (rpm > 0) grp.rotation.y += dir * ((rpm * 2 * Math.PI)/60) * dt;
+        const bMat = blur.material as THREE.MeshBasicMaterial;
+        if (rpm > 1100) {
+          const a = Math.min(0.18, (rpm-1100)/4000 * 0.18);
+          bMat.opacity = a;
+          // subtle spin for blur shimmer
+          blur.rotation.z += dir * 0.5 * dt;
+          // hide solid blades by scaling? keep visible under blur for realism — reduce opacity via material? keep
+          grp.children.forEach((c:any, idx:number) => {
+            if (c.geometry && c.geometry.type === 'BoxGeometry') c.material.transparent = true, c.material.opacity = Math.max(0.15, 1 - (rpm/6000));
+          });
+        } else {
+          bMat.opacity = 0;
+          grp.children.forEach((c:any) => {
+            if (c.material) c.material.opacity = 1, c.material.transparent = false;
+          });
+        }
+      });
 
-      // Rotate Propellers strictly based on actual measured RPM
-      if (propGroups['m1'] && tState.m1Rpm > 0) {
-        propGroups['m1'].rotation.y += ((tState.m1Rpm * 2 * Math.PI) / 60.0) * dt;
-      }
-      if (propGroups['m2'] && tState.m2Rpm > 0) {
-        propGroups['m2'].rotation.y += ((tState.m2Rpm * 2 * Math.PI) / 60.0) * dt;
-      }
-      if (propGroups['m3'] && tState.m3Rpm > 0) {
-        propGroups['m3'].rotation.y -= ((tState.m3Rpm * 2 * Math.PI) / 60.0) * dt; // CCW
-      }
-      if (propGroups['m4'] && tState.m4Rpm > 0) {
-        propGroups['m4'].rotation.y -= ((tState.m4Rpm * 2 * Math.PI) / 60.0) * dt; // CCW
-      }
-
-      // Blink APM LED if telemetry is connected
-      if (tState.isConnected && tState.heartbeat) {
-        ledMat.color.setHex((Math.floor(now * 4) % 2 === 0) ? 0x10b981 : 0x0284c7);
+      // LED
+      if (t.isConnected && t.heartbeat) {
+        const blink = Math.floor(now*3.5)%2===0;
+        ledMat.color.setHex(blink ? 0x22c55e : 0x3b82f6);
+        (ledMat as any).emissive.setHex(blink ? 0x22c55e : 0x3b82f6);
+        (ledMat as any).emissiveIntensity = 0.9;
       } else {
-        ledMat.color.setHex(0xef4444);
+        ledMat.color.setHex(0x6b7280);
+        (ledMat as any).emissive.setHex(0x000000);
       }
 
-      // Live 3D Attitude Synchronization from Telemetry (Roll / Pitch / Yaw)
-      if (tState.hasRealAttitude) {
-        // Convert APM roll/pitch/yaw (degrees) to Three.js coordinates
-        const targetPitch = (tState.pitchDeg * Math.PI) / 180.0;
-        const targetRoll = (tState.rollDeg * Math.PI) / 180.0;
-        const targetYaw = (tState.yawDeg * Math.PI) / 180.0;
+      // Vibration micro-jitter on whole drone
+      const vib = Math.min(0.025, t.vib * 0.04);
+      droneGroup.position.y = Math.sin(now*38)*vib*0.5 + Math.sin(now*72)*vib*0.25;
+      droneGroup.position.x = Math.sin(now*31)*vib*0.15;
+      droneGroup.position.z = Math.cos(now*29)*vib*0.12;
 
-        // Smoothly interpolate current rotation towards target
-        droneGroup.rotation.x += (targetPitch - droneGroup.rotation.x) * Math.min(1.0, dt * 10.0);
-        droneGroup.rotation.z += (-targetRoll - droneGroup.rotation.z) * Math.min(1.0, dt * 10.0);
-        droneGroup.rotation.y += (-targetYaw - droneGroup.rotation.y) * Math.min(1.0, dt * 6.0);
-      } else if (tState.isConnected) {
-        // Physical testbed resting on bench: maintain true level attitude without synthetic oscillation
-        droneGroup.rotation.x += (0 - droneGroup.rotation.x) * Math.min(1.0, dt * 10.0);
-        droneGroup.rotation.z += (0 - droneGroup.rotation.z) * Math.min(1.0, dt * 10.0);
-        droneGroup.rotation.y += (0 - droneGroup.rotation.y) * Math.min(1.0, dt * 6.0);
+      // Temperature tint: if hot, slight emissive on belly
+      // (handled via batteryMat emissive? keep subtle)
+
+      // Attitude
+      if (t.hasRealAttitude) {
+        const tp = (t.pitchDeg * Math.PI)/180, tr = (t.rollDeg * Math.PI)/180, ty = (t.yawDeg * Math.PI)/180;
+        droneGroup.rotation.x += (tp - droneGroup.rotation.x) * Math.min(1, dt*8);
+        droneGroup.rotation.z += (-tr - droneGroup.rotation.z) * Math.min(1, dt*8);
+        droneGroup.rotation.y += (-ty - droneGroup.rotation.y) * Math.min(1, dt*5);
+      } else if (t.isConnected) {
+        droneGroup.rotation.x += (0 - droneGroup.rotation.x) * Math.min(1, dt*6);
+        droneGroup.rotation.z += (0 - droneGroup.rotation.z) * Math.min(1, dt*6);
+        droneGroup.rotation.y += (0 - droneGroup.rotation.y) * Math.min(1, dt*4);
       } else {
-        // Subtle gentle hover roll/pitch oscillation for digital twin standby only
-        droneGroup.rotation.y = Math.sin(now * 0.2) * 0.15;
-        droneGroup.rotation.z = Math.sin(now * 0.4) * 0.015;
-        droneGroup.rotation.x = Math.cos(now * 0.3) * 0.01;
+        droneGroup.rotation.y = Math.sin(now*0.18)*0.14;
+        droneGroup.rotation.z = Math.sin(now*0.32)*0.012;
+        droneGroup.rotation.x = Math.cos(now*0.24)*0.008;
       }
 
       controls.update();
       renderer.render(scene, camera);
     };
-
     animate();
 
     const handleResize = () => {
       if (!container) return;
-      const newWidth = container.clientWidth;
-      const newHeight = container.clientHeight;
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
+      const nw = container.clientWidth, nh = container.clientHeight;
+      camera.aspect = nw/nh; camera.updateProjectionMatrix(); renderer.setSize(nw, nh);
     };
-
     window.addEventListener('resize', handleResize);
-
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       controls.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
+      scene.traverse((obj:any) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach((m:any)=>m.dispose());
+          else obj.material.dispose();
+        }
+      });
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       renderer.dispose();
     };
   }, [theme]);
 
   const handleResetView = () => {
-    if (controlsRef.current) {
-      controlsRef.current.reset();
-      controlsRef.current.target.set(0, 0, 0);
-    }
+    if (controlsRef.current) { controlsRef.current.reset(); controlsRef.current.target.set(0, 0.05, 0); }
   };
 
   const tel = systemState?.telemetry;
   const isConn = tel?.connection_status === 'CONNECTED' || tel?.source_type === 'SIMULATION';
   const flightMode = tel?.flight_mode || 'STABILIZE';
   const isArmed = !!tel?.is_armed;
-  const renderMotorHudCard = (motorKey: string, label: string) => {
-    const motor = tel?.motors?.[motorKey];
-    const isMotorConnected = motor ? (motor.is_connected !== false && motor.connection_status !== 'DISCONNECTED') : false;
-    const rpm = isMotorConnected ? Math.round(motor?.live_rpm ?? 0) : 0;
-    const curr = isMotorConnected && motor?.current_a != null ? motor.current_a.toFixed(2) : '0.00';
-    const thrustG = isMotorConnected ? Math.round(motor?.thrust_g ?? 0) : 0;
-    const temp = isMotorConnected && motor?.temperature_c != null ? `${motor.temperature_c.toFixed(0)}°C` : null;
-
+  const renderHud = (k: string, label: string) => {
+    const m:any = tel?.motors?.[k];
+    const conn = m ? (m.is_connected !== false && m.connection_status !== 'DISCONNECTED') : false;
+    const rpm = conn ? Math.round(m?.live_rpm ?? 0) : 0;
+    const curr = conn && m?.current_a != null ? m.current_a.toFixed(2) : '—';
+    const thrust = conn ? Math.round(m?.thrust_g ?? 0) : 0;
     return (
-      <div
-        key={motorKey}
-        className={`p-2 rounded-lg border backdrop-blur-md transition-all ${
-          isMotorConnected
-            ? 'bg-white/90 dark:bg-slate-900/90 border-slate-200/80 dark:border-slate-800 shadow-sm'
-            : 'bg-rose-500/10 dark:bg-rose-950/40 border-rose-400/40 text-rose-600 dark:text-rose-400'
-        }`}
-      >
+      <div key={k} className="p-2 rounded-md border backdrop-blur-md" style={{ background: 'color-mix(in srgb, var(--card) 88%, transparent)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between gap-1 mb-1">
-          <span className="font-bold truncate text-[10px]">{label}</span>
-          <span
-            className={`px-1 py-0.2 rounded text-[8px] font-bold ${
-              !isMotorConnected
-                ? 'bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
-                : rpm > 50
-                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
-                : 'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
-            }`}
-          >
-            {!isMotorConnected ? '✕ NOT CONNECTED' : rpm > 50 ? '● RUNNING' : '○ IDLE'}
-          </span>
+          <span className="font-medium text-[10px] tracking-wide" style={{ color: 'var(--text)' }}>{label}</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[9px] border font-medium" style={{ background: conn ? (rpm>50 ? 'var(--text)' : 'var(--card)') : 'var(--card)', color: conn ? (rpm>50 ? 'var(--bg)' : 'var(--text-muted)') : 'var(--text-faint)', borderColor: 'var(--border)' }}>{!conn ? 'Offline' : rpm>50 ? 'Run' : 'Idle'}</span>
         </div>
-        <div className="flex items-baseline justify-between font-mono">
-          <span className="text-xs font-bold">
-            {isMotorConnected ? (rpm > 0 ? `${rpm.toLocaleString()} RPM` : '0 RPM (IDLE)') : '0 RPM (OFFLINE)'}
-          </span>
-          {isMotorConnected ? (
-            <span className="text-[10px] text-slate-500">
-              {curr}A {thrustG > 0 ? `• ${thrustG}g` : ''} {temp ? `• ${temp}` : ''}
-            </span>
-          ) : (
-            <span className="text-[9px] text-rose-500 font-sans">Hardware Unplugged</span>
-          )}
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-medium tabular-nums" style={{ color: 'var(--text)' }}>{conn ? (rpm>0 ? `${rpm.toLocaleString()} RPM` : '0 RPM') : '—'}</span>
+          {conn && <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{curr}A {thrust? `• ${thrust}g`:''}</span>}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="aerospace-card p-4 relative overflow-hidden flex flex-col h-[540px] min-h-[500px] select-none shadow-md">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between z-10 mb-2 gap-2">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
-            <Cpu className="w-4 h-4" />
-          </div>
+    <div className="aerospace-card p-5 relative overflow-hidden flex flex-col h-[520px] min-h-[480px] select-none">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'var(--text)', color: 'var(--bg)' }}><Cpu className="w-3.5 h-3.5" /></div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-sans">
-                3D Quadcopter Digital Twin
-              </h3>
-              <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                F450 CAD AIRFRAME
-              </span>
-              {/* Flight Mode & Armed State Badges */}
-              <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700">
-                MODE: {flightMode}
-              </span>
-              <span className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border ${
-                isArmed 
-                  ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' 
-                  : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-              }`}>
-                {isArmed ? '● ARMED' : '○ DISARMED'}
-              </span>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>3D Digital Twin</span>
+              <span className="hidden sm:inline text-[11px] px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>{flightMode}</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium" style={{ background: isArmed ? 'var(--text)' : 'transparent', color: isArmed ? 'var(--bg)' : 'var(--text-muted)', borderColor: isArmed ? 'var(--text)' : 'var(--border)' }}>{isArmed ? 'Armed' : 'Disarmed'}</span>
             </div>
-            <p className="text-[11px] text-slate-500 font-mono">
-              Autodesk Inventor CAD Assembly (450mm Diagonal • 30 Solid Components) • Live ArduPilot Sync
-            </p>
+            <div className="text-[11px] hidden sm:block" style={{ color: 'var(--text-faint)' }}>Realistic F450 • Drag to orbit • Scroll to zoom</div>
           </div>
         </div>
-
-        {/* Live Controls & Attitude */}
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-            <Shield className="w-3 h-3 text-sky-500" />
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-              {tel?.flight_mode || 'STABILIZE'} {tel?.is_armed ? '(ARMED)' : '(DISARMED)'}
-            </span>
-          </div>
-
-          <span className="hidden md:inline-flex items-center gap-1 text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
-            <Move className="w-3 h-3 text-sky-500" /> Drag to Rotate
-          </span>
-
-          <button
-            onClick={handleResetView}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <RotateCcw className="w-3 h-3" /> Reset View
-          </button>
-        </div>
+        <button onClick={handleResetView} className="text-xs px-3 py-1.5 rounded-full border" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'var(--card)' }}>Reset view</button>
       </div>
-
-      {/* 3D WebGL Canvas */}
-      <div 
-        ref={containerRef} 
-        className="w-full flex-1 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 relative cursor-grab active:cursor-grabbing"
-      />
-
-      {/* Floating Channel RPM HUD overlay */}
-      <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono select-none pointer-events-none">
-        {renderMotorHudCard('motor_1', 'M1 - FRONT RIGHT (CW)')}
-        {renderMotorHudCard('motor_2', 'M2 - REAR LEFT (CW)')}
-        {renderMotorHudCard('motor_3', 'M3 - FRONT LEFT (CCW)')}
-        {renderMotorHudCard('motor_4', 'M4 - REAR RIGHT (CCW)')}
+      <div ref={containerRef} className="w-full flex-1 rounded-lg overflow-hidden border relative cursor-grab active:cursor-grabbing" style={{ background: theme==='dark' ? '#0a0a0a' : '#f8fafc', borderColor: 'var(--border)' }} />
+      <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] select-none pointer-events-none">
+        {renderHud('motor_1', 'M1 Front-R (CW)')}
+        {renderHud('motor_2', 'M2 Rear-L (CW)')}
+        {renderHud('motor_3', 'M3 Front-L (CCW)')}
+        {renderHud('motor_4', 'M4 Rear-R (CCW)')}
       </div>
     </div>
   );

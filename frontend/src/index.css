@@ -1,56 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-slate-50 text-slate-800 antialiased selection:bg-sky-500 selection:text-white transition-colors duration-200;
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --border: #e5e5e5;
+    --border-strong: #d4d4d4;
+    --text: #0a0a0a;
+    --text-muted: #737373;
+    --text-faint: #a3a3a3;
+    --accent: #0a0a0a;
+    --accent-soft: #f5f5f5;
+    --success: #0a0a0a;
+    --success-bg: #f5f5f5;
+    --success-border: #e5e5e5;
+    --warning: #525252;
+    --warning-bg: #f5f5f5;
+    --warning-border: #e5e5e5;
+    --critical: #0a0a0a;
+    --critical-bg: #fafafa;
+    --critical-border: #0a0a0a;
   }
-  .dark body,
-  body.dark {
-    @apply bg-slate-950 text-slate-100;
+  .dark {
+    --bg: #0a0a0a;
+    --card: #171717;
+    --border: #262626;
+    --border-strong: #404040;
+    --text: #fafafa;
+    --text-muted: #a3a3a3;
+    --text-faint: #737373;
+    --accent: #fafafa;
+    --accent-soft: #262626;
+    --success-bg: #262626;
+    --success-border: #404040;
+    --warning-bg: #262626;
+    --warning-border: #404040;
+    --critical-bg: #1a1a1a;
+    --critical-border: #525252;
+  }
+  body {
+    @apply antialiased;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 
-/* Custom scrollbar for high-density GCS panels */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-.dark ::-webkit-scrollbar-track {
-  background: #090d16;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 999px; }
+.dark ::-webkit-scrollbar-thumb { background: #404040; }
 
 .aerospace-card {
-  @apply bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl shadow-sm transition-all duration-200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
+.aerospace-card:hover {
+  border-color: var(--border-strong);
 }
 
-.aerospace-badge-validated {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800;
+.card-flat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
-.aerospace-badge-proxy {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800;
-}
-
+.aerospace-badge-validated,
+.aerospace-badge-proxy,
 .aerospace-badge-future {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800;
+  @apply inline-flex items-center px-2.5 rounded-full text-[11px] font-medium tracking-wide border;
+  height: 20px;
+  background: var(--card);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.dark .aerospace-badge-validated,
+.dark .aerospace-badge-proxy,
+.dark .aerospace-badge-future {
+  background: var(--card);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeInUp { animation: fadeInUp 0.3s ease-out forwards; }
+.animate-slideDown { animation: slideDown 0.2s ease-out forwards; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+*:focus-visible { outline: 1px solid var(--text); outline-offset: 2px; }
+.glass { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* ——— Production override: force legacy colored utilities to monochrome ——— */
+.bg-sky-600, .bg-emerald-600, .bg-rose-600, .bg-amber-600, .bg-emerald-500, .bg-rose-500, .bg-sky-500 { background: var(--text) !important; color: var(--bg) !important; }
+.text-sky-600, .text-sky-500, .text-emerald-600, .text-emerald-500, .text-rose-600, .text-amber-600, .text-purple-600 { color: var(--text) !important; }
+.bg-sky-50, .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-purple-50, .bg-slate-50 { background: var(--bg) !important; }
+.border-sky-200, .border-emerald-200, .border-rose-200, .border-amber-200, .border-purple-200, .border-slate-200 { border-color: var(--border) !important; }
+.shadow-sky-600\/20, .shadow-sm { box-shadow: none !important; }
+
+/* Dark-mode legacy slate fixes — ensure text visible on dark cards */
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: var(--text) !important; }
+.dark .text-slate-600, .dark .text-slate-500 { color: var(--text-muted) !important; }
+.dark .text-slate-400, .dark .text-slate-300 { color: var(--text-faint) !important; }
+.dark .bg-white, .dark .bg-slate-50, .dark .bg-slate-100 { background: var(--card) !important; color: var(--text) !important; }
+.dark .bg-slate-900, .dark .bg-slate-950 { background: var(--card) !important; }
+.dark .border-slate-200, .dark .border-slate-800, .dark .border-slate-700 { border-color: var(--border) !important; }
+.dark .bg-slate-100\/80, .dark .bg-slate-800\/80 { background: var(--card) !important; }
+/* Wildcard fallbacks for opacity variants */
+.dark [class*="bg-slate-"], .dark [class*="bg-white/"] { background-color: var(--card) !important; }
+.dark [class*="border-slate-"] { border-color: var(--border) !important; }
+.dark [class*="bg-sky-"], .dark [class*="bg-emerald-"], .dark [class*="bg-rose-"], .dark [class*="bg-amber-"] { background: var(--card) !important; color: var(--text) !important; }
+.dark .text-slate-950, .dark .text-slate-200, .dark .text-slate-100, .dark .text-slate-50 { color: var(--text-muted) !important; }
+/* Recharts dark tooltip/axis fixes */
+.dark .recharts-cartesian-grid-horizontal line, .dark .recharts-cartesian-grid-vertical line { stroke: var(--border) !important; }
+.dark .recharts-text { fill: var(--text-faint) !important; }
+.dark .recharts-tooltip-wrapper { filter: none !important; }

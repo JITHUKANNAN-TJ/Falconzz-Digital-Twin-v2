@@ -3,7 +3,6 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { AlertDrawer } from './components/AlertDrawer';
 import { ParameterHelpModal } from './components/ParameterHelpModal';
-import { AskFalconzModal } from './components/AskFalconzModal';
 import { useAppStore } from './state/store';
 
 // Pages
@@ -64,19 +63,19 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col transition-colors duration-200" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <Navbar />
       <div className="flex-1 flex">
         <Sidebar />
-        <main className="flex-1 p-4 sm:p-5 overflow-y-auto max-w-7xl mx-auto w-full">
-          {renderActivePage()}
+        <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 overflow-y-auto w-full">
+          <div className="max-w-[1280px] mx-auto w-full animate-fadeInUp" key={activePage}>
+            {renderActivePage()}
+          </div>
         </main>
       </div>
 
-      {/* Global Modals & Floating Assistants */}
       <AlertDrawer />
       <ParameterHelpModal />
-      <AskFalconzModal />
     </div>
   );
 };

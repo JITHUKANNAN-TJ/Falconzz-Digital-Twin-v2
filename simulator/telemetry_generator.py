@@ -27,6 +27,8 @@ class TelemetryGenerator:
         self.ambient_temp_c: float = settings.DEFAULT_AMBIENT_TEMP_C
         self.internal_temp: float = settings.DEFAULT_AMBIENT_TEMP_C
         self.last_step_time: float = time.time()
+        self.sim_yaw_deg: float = 0.0
+        self.sim_time_origin: float = time.time()
         
         # Connection state for each of the 4 individual motors (synced from persistent mapping_store)
         try:
@@ -268,6 +270,27 @@ class TelemetryGenerator:
         effective_global_curr = round(tot_curr / conn_count, 2) if conn_count > 0 else 0.0
         effective_global_temp = (sum(connected_temps) / conn_count) if conn_count > 0 else self.ambient_temp_c
         effective_global_vib = (sum(connected_vibs) / conn_count) if conn_count > 0 else 0.015
+
+        # ——— Realistic attitude synthesis for 3D (was missing → add) ———
+        t = now - self.sim_time_origin
+        # Yaw slow drift + throttle influence
+        yaw_rate = 1.2 + (self.throttle_pct / 100.0) * 2.5
+        self.sim_yaw_deg = (self.sim_yaw_deg + yaw_rate * dt * (0.3 if conn_count==0 else 1.0)) % 360.0
+        # Roll/pitch small oscillations scaled by scenario severity
+        sev_att = sev if self.active_scenario != ScenarioType.NORMAL else 0.15
+        roll_deg = math.sin(t*0.35) * (1.8 + sev_att*4.5) + math.sin(t*1.7)*0.3*sev_att + random.gauss(0,0.08)
+        pitch_deg = math.cos(t*0.42) * (1.2 + sev_att*3.0) + math.sin(t*0.9)*0.25*sev_att + random.gauss(0,0.08)
+        # Add imbalance-induced tilt for degraded scenarios
+        if conn_count >= 2 and rpm_imb > 20:
+            roll_deg += (rpm_imb/60.0) * math.sin(t*0.8)
+        # Clamp
+        roll_deg = max(-22, min(22, roll_deg))
+        pitch_deg = max(-18, min(18, pitch_deg))
+        yaw_deg = self.sim_yaw_deg if conn_count>0 else 0.0
+        # Flight mode & armed synthetic
+        is_armed_sim = conn_count>0 and self.throttle_pct>5.0
+        flight_mode_sim = "LOITER" if 48 < self.throttle_pct < 62 else ("STABILIZE" if self.throttle_pct>5 else "STANDBY")
+        sats_sim = 12 if conn_count>0 else 0
         
         return {
             "timestamp": now,
@@ -281,6 +304,16 @@ class TelemetryGenerator:
             "load_pct": effective_load,
             "ambient_temperature_c": self.ambient_temp_c,
             "torque_nm": torque_nm if conn_count > 0 else 0.0,
+            "roll_deg": round(roll_deg,2) if conn_count>0 else 0.0,
+            "pitch_deg": round(pitch_deg,2) if conn_count>0 else 0.0,
+            "yaw_deg": round(yaw_deg,2) if conn_count>0 else 0.0,
+            "rollspeed_deg_s": round(math.cos(t*0.35)*0.7,2),
+            "pitchspeed_deg_s": round(-math.sin(t*0.42)*0.5,2),
+            "yawspeed_deg_s": round(yaw_rate,2) if conn_count>0 else 0.0,
+            "flight_mode": flight_mode_sim,
+            "is_armed": is_armed_sim,
+            "satellites_visible": sats_sim,
+            "heartbeat_received": True if conn_count>0 else False,
             
             # Discrete 4-motor Quadcopter channels
             "motors": motors_dict,

@@ -89,10 +89,8 @@ export const Quadcopter3DViewer: React.FC = () => {
     const height = container.clientHeight || 480;
 
     const isDark = theme === 'dark';
-
-    // 1. Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDark ? 0x090d16 : 0xf8fafc);
+    scene.background = new THREE.Color(isDark ? 0x0a0a0a : 0xffffff);
 
     // Optimized camera distance and field of view for high visibility of full F450 assembly
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
@@ -125,17 +123,8 @@ export const Quadcopter3DViewer: React.FC = () => {
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const cyanPoint = new THREE.PointLight(0x0ea5e9, 0.8, 12);
-    cyanPoint.position.set(0, 3, 0);
-    scene.add(cyanPoint);
-
-    // 3. Grid Helper
-    const gridHelper = new THREE.GridHelper(
-      10, 
-      20, 
-      isDark ? 0x0284c7 : 0x0284c7, 
-      isDark ? 0x1e293b : 0xe2e8f0
-    );
+    // 3. Grid Helper — monochrome
+    const gridHelper = new THREE.GridHelper(10, 20, isDark ? 0x404040 : 0xd4d4d4, isDark ? 0x262626 : 0xe5e5e5);
     gridHelper.position.y = -0.28;
     scene.add(gridHelper);
 
@@ -143,36 +132,12 @@ export const Quadcopter3DViewer: React.FC = () => {
     const droneGroup = new THREE.Group();
     scene.add(droneGroup);
 
-    // Materials
-    const carbonMat = new THREE.MeshStandardMaterial({
-      color: isDark ? 0x1e293b : 0x334155,
-      roughness: 0.3,
-      metalness: 0.8
-    });
-    const frameCenterMat = new THREE.MeshStandardMaterial({
-      color: isDark ? 0x0f172a : 0x1e293b,
-      roughness: 0.2,
-      metalness: 0.9
-    });
-    const motorStatorBaseMat = new THREE.MeshStandardMaterial({
-      color: 0x475569,
-      roughness: 0.4,
-      metalness: 0.7
-    });
-    const propBladeMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.2,
-      metalness: 0.3
-    });
-    const batteryMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706, // Amber LiPo pack
-      roughness: 0.5
-    });
-    const apmMat = new THREE.MeshStandardMaterial({
-      color: 0x0369a1, // APM Blue enclosure
-      roughness: 0.3,
-      metalness: 0.5
-    });
+    const carbonMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x262626 : 0x404040, roughness: 0.3, metalness: 0.6 });
+    const frameCenterMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x171717 : 0x262626, roughness: 0.2, metalness: 0.8 });
+    const motorStatorBaseMat = new THREE.MeshStandardMaterial({ color: 0x525252, roughness: 0.4, metalness: 0.6 });
+    const propBladeMat = new THREE.MeshStandardMaterial({ color: isDark ? 0xfafafa : 0x0a0a0a, roughness: 0.2, metalness: 0.2 });
+    const batteryMat = new THREE.MeshStandardMaterial({ color: 0x737373, roughness: 0.5 });
+    const apmMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x404040 : 0x262626, roughness: 0.3, metalness: 0.5 });
 
     // Authentic DJI F450 CAD Airframe (Converted from Autodesk Inventor STEP AP214)
     const gltfLoader = new GLTFLoader();
@@ -201,9 +166,8 @@ export const Quadcopter3DViewer: React.FC = () => {
     apmMesh.castShadow = true;
     droneGroup.add(apmMesh);
 
-    // APM Telemetry Status LED
     const ledGeo = new THREE.SphereGeometry(0.035, 16, 16);
-    const ledMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0xa3a3a3 });
     const ledMesh = new THREE.Mesh(ledGeo, ledMat);
     ledMesh.position.set(0.12, 0.27, 0.12);
     droneGroup.add(ledMesh);
@@ -239,9 +203,8 @@ export const Quadcopter3DViewer: React.FC = () => {
       statorMesh.castShadow = true;
       motorBase.add(statorMesh);
 
-      // Status Halo / Glow Ring under motor mount
       const haloGeo = new THREE.TorusGeometry(0.23, 0.035, 16, 32);
-      const haloMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0x737373 });
       const haloMesh = new THREE.Mesh(haloGeo, haloMat);
       haloMesh.rotation.x = Math.PI / 2;
       haloMesh.position.y = 0.01;
@@ -281,13 +244,12 @@ export const Quadcopter3DViewer: React.FC = () => {
       const now = clock.getElapsedTime();
       const tState = telemetryRef.current;
 
-      // Update Motor Status Colors (Green, Amber, Red, Gray, Disconnected)
       const colorMap: Record<string, number> = {
-        GREEN: 0x10b981,
-        AMBER: 0xf59e0b,
-        RED: 0xef4444,
-        GRAY: 0x64748b,
-        DISCONNECTED: 0x334155
+        GREEN: 0x0a0a0a,
+        AMBER: 0x737373,
+        RED: 0x171717,
+        GRAY: 0xa3a3a3,
+        DISCONNECTED: 0xd4d4d4
       };
 
       if (motorStatusMeshes['m1']) (motorStatusMeshes['m1'].material as THREE.MeshBasicMaterial).color.setHex(colorMap[tState.m1Status] ?? 0x10b981);
@@ -309,11 +271,10 @@ export const Quadcopter3DViewer: React.FC = () => {
         propGroups['m4'].rotation.y -= ((tState.m4Rpm * 2 * Math.PI) / 60.0) * dt; // CCW
       }
 
-      // Blink APM LED if telemetry is connected
       if (tState.isConnected && tState.heartbeat) {
-        ledMat.color.setHex((Math.floor(now * 4) % 2 === 0) ? 0x10b981 : 0x0284c7);
+        ledMat.color.setHex((Math.floor(now * 4) % 2 === 0) ? 0x0a0a0a : 0x737373);
       } else {
-        ledMat.color.setHex(0xef4444);
+        ledMat.color.setHex(0xd4d4d4);
       }
 
       // Live 3D Attitude Synchronization from Telemetry (Roll / Pitch / Yaw)
@@ -384,70 +345,38 @@ export const Quadcopter3DViewer: React.FC = () => {
     const rpm = isMotorConnected ? Math.round(motor?.live_rpm ?? 0) : 0;
     const curr = isMotorConnected && motor?.current_a != null ? motor.current_a.toFixed(2) : '0.00';
     const thrustG = isMotorConnected ? Math.round(motor?.thrust_g ?? 0) : 0;
-    const temp = isMotorConnected && motor?.temperature_c != null ? `${motor.temperature_c.toFixed(0)}°C` : null;
-
     return (
-      <div
-        key={motorKey}
-        className={`p-2 rounded-lg border backdrop-blur-md transition-all ${
-          isMotorConnected
-            ? 'bg-white/90 dark:bg-slate-900/90 border-slate-200/80 dark:border-slate-800 shadow-sm'
-            : 'bg-rose-500/10 dark:bg-rose-950/40 border-rose-400/40 text-rose-600 dark:text-rose-400'
-        }`}
-      >
+      <div key={motorKey} className="p-2 rounded-md border bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between gap-1 mb-1">
-          <span className="font-bold truncate text-[10px]">{label}</span>
-          <span
-            className={`px-1 py-0.2 rounded text-[8px] font-bold ${
-              !isMotorConnected
-                ? 'bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
-                : rpm > 50
-                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
-                : 'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
-            }`}
-          >
-            {!isMotorConnected ? '✕ NOT CONNECTED' : rpm > 50 ? '● RUNNING' : '○ IDLE'}
-          </span>
+          <span className="font-medium truncate text-[10px] tracking-wide" style={{ color: 'var(--text)' }}>{label}</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[9px] border" style={{ background: isMotorConnected ? (rpm>50 ? 'var(--text)' : 'var(--card)') : 'var(--card)', color: isMotorConnected ? (rpm>50 ? 'var(--bg)' : 'var(--text-muted)') : 'var(--text-faint)', borderColor: 'var(--border)' }}>{!isMotorConnected ? 'Offline' : rpm>50 ? 'Run' : 'Idle'}</span>
         </div>
-        <div className="flex items-baseline justify-between font-mono">
-          <span className="text-xs font-bold">
-            {isMotorConnected ? (rpm > 0 ? `${rpm.toLocaleString()} RPM` : '0 RPM (IDLE)') : '0 RPM (OFFLINE)'}
-          </span>
-          {isMotorConnected ? (
-            <span className="text-[10px] text-slate-500">
-              {curr}A {thrustG > 0 ? `• ${thrustG}g` : ''} {temp ? `• ${temp}` : ''}
-            </span>
-          ) : (
-            <span className="text-[9px] text-rose-500 font-sans">Hardware Unplugged</span>
-          )}
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-medium tabular-nums" style={{ color: 'var(--text)' }}>{isMotorConnected ? (rpm>0 ? `${rpm.toLocaleString()} RPM` : '0 RPM') : '—'}</span>
+          {isMotorConnected && <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{curr}A {thrustG>0 ? `• ${thrustG}g` : ''}</span>}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="aerospace-card p-5 relative overflow-hidden flex flex-col h-[540px] min-h-[500px] select-none">
-      {/* Header — minimal */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}><Cpu className="w-4 h-4" /></div>
+    <div className="aerospace-card p-5 relative overflow-hidden flex flex-col h-[480px] min-h-[460px] select-none">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md border flex items-center justify-center" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}><Cpu className="w-3.5 h-3.5" /></div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold tracking-[0.12em] uppercase" style={{ color: 'var(--text)' }}>3D Digital Twin</span>
-              <span className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full border h-5 inline-flex items-center" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderColor: 'var(--warning-border)' }}>F450 CAD</span>
-              <span className="text-[10px] font-semibold px-2 py-1 rounded-full border h-5 inline-flex items-center hidden sm:inline-flex" style={{ background: 'rgba(2,132,199,0.08)', color: 'var(--accent)', borderColor: 'rgba(2,132,199,0.18)' }}>{flightMode}</span>
-              <span className="text-[10px] font-bold px-2 py-1 rounded-full border h-5 inline-flex items-center" style={{ background: isArmed ? 'var(--critical-bg)' : 'var(--success-bg)', color: isArmed ? 'var(--critical)' : 'var(--success)', borderColor: isArmed ? 'var(--critical-border)' : 'var(--success-border)' }}>{isArmed ? 'ARMED' : 'DISARMED'}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>3D Model</span>
+              <span className="hidden sm:inline text-[11px] px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>{flightMode}</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full border" style={{ background: isArmed ? 'var(--text)' : 'var(--card)', color: isArmed ? 'var(--bg)' : 'var(--text-muted)', borderColor: isArmed ? 'var(--text)' : 'var(--border)' }}>{isArmed ? 'Armed' : 'Disarmed'}</span>
             </div>
-            <p className="text-[11px] mt-0.5 hidden sm:block" style={{ color: 'var(--text-faint)' }}>450 mm • 30 components • Live ArduPilot sync</p>
+            <div className="text-[11px] hidden sm:block" style={{ color: 'var(--text-faint)' }}>Drag to rotate • Scroll to zoom</div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}><Move className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Drag to rotate</span>
-          <button onClick={handleResetView} className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border hover:opacity-80 transition-colors" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}><RotateCcw className="w-3 h-3" /> Reset</button>
-        </div>
+        <button onClick={handleResetView} className="text-xs px-3 py-1.5 rounded-full border hover:bg-neutral-50 dark:hover:bg-neutral-900" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>Reset</button>
       </div>
 
-      <div ref={containerRef} className="w-full flex-1 rounded-xl overflow-hidden border relative cursor-grab active:cursor-grabbing" style={{ background: 'color-mix(in srgb, var(--bg) 70%, var(--card))', borderColor: 'var(--border)' }} />
+      <div ref={containerRef} className="w-full flex-1 rounded-lg overflow-hidden border relative cursor-grab active:cursor-grabbing" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }} />
 
       {/* Floating Channel RPM HUD overlay */}
       <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono select-none pointer-events-none">

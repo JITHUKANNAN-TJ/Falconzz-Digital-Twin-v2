@@ -1,56 +1,150 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+    --accent: #0284c7;
+    --accent-soft: rgba(2,132,199,0.08);
+    --success: #059669;
+    --success-bg: rgba(5,150,105,0.08);
+    --success-border: #a7f3d0;
+    --warning: #d97706;
+    --warning-bg: rgba(217,119,6,0.08);
+    --warning-border: #fde68a;
+    --critical: #dc2626;
+    --critical-bg: rgba(220,38,38,0.08);
+    --critical-border: #fecaca;
+  }
+  .dark {
+    --bg: #0f1419;
+    --card: #161b22;
+    --border: #232a31;
+    --border-strong: #2d3748;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #38bdf8;
+    --accent-soft: rgba(56,189,248,0.1);
+  }
   body {
-    @apply bg-slate-50 text-slate-800 antialiased selection:bg-sky-500 selection:text-white transition-colors duration-200;
+    @apply antialiased selection:bg-sky-500 selection:text-white;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  .dark body,
-  body.dark {
-    @apply bg-slate-950 text-slate-100;
+  * {
+    font-variant-ligatures: common-ligatures;
   }
 }
 
-/* Custom scrollbar for high-density GCS panels */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-.dark ::-webkit-scrollbar-track {
-  background: #090d16;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+/* Minimal hairline scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.dark ::-webkit-scrollbar-thumb { background: #2d3748; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
+/* ——— Professional Card System ——— */
 .aerospace-card {
-  @apply bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl shadow-sm transition-all duration-200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16,24,40,0.04);
+  transition: all 0.2s ease;
+}
+.aerospace-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 12px -2px rgba(16,24,40,0.06), 0 2px 6px -1px rgba(16,24,40,0.04);
+  transform: translateY(-1px);
+}
+.dark .aerospace-card:hover {
+  border-color: #2d3748;
 }
 
+/* Minimal flat card variant */
+.card-flat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* ——— Badge System — unified pill h-5 ——— */
 .aerospace-badge-validated {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800;
+  @apply inline-flex items-center px-2.5 py-0 rounded-full text-[11px] font-semibold tracking-wide border;
+  height: 20px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success-border);
 }
-
 .aerospace-badge-proxy {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800;
+  @apply inline-flex items-center px-2.5 py-0 rounded-full text-[11px] font-semibold tracking-wide border;
+  height: 20px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning-border);
 }
-
 .aerospace-badge-future {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800;
+  @apply inline-flex items-center px-2.5 py-0 rounded-full text-[11px] font-semibold tracking-wide border;
+  height: 20px;
+  background: rgba(139,92,246,0.08);
+  color: #7c3aed;
+  border-color: #ddd6fe;
 }
+.dark .aerospace-badge-validated { background: rgba(5,150,105,0.12); border-color: rgba(5,150,105,0.2); }
+.dark .aerospace-badge-proxy { background: rgba(217,119,6,0.12); border-color: rgba(217,119,6,0.2); }
+.dark .aerospace-badge-future { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.2); color: #a78bfa; }
 
+/* ——— Animations ——— */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-fadeInUp { animation: fadeInUp 0.35s ease-out forwards; }
+.animate-slideDown { animation: slideDown 0.25s ease-out forwards; }
+.animate-pulse-soft { animation: pulseSoft 2.8s ease-in-out infinite; }
+
+/* Stagger children */
+.stagger > * { opacity: 0; animation: fadeInUp 0.4s ease-out forwards; }
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger > *:nth-child(5) { animation-delay: 0.2s; }
+
+/* Tabular numbers for all metrics */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Focus ring minimal */
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Glass effect for navbar */
+.glass {
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+}

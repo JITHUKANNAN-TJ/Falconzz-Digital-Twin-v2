@@ -426,66 +426,28 @@ export const Quadcopter3DViewer: React.FC = () => {
   };
 
   return (
-    <div className="aerospace-card p-4 relative overflow-hidden flex flex-col h-[540px] min-h-[500px] select-none shadow-md">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between z-10 mb-2 gap-2">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
-            <Cpu className="w-4 h-4" />
-          </div>
+    <div className="aerospace-card p-5 relative overflow-hidden flex flex-col h-[540px] min-h-[500px] select-none">
+      {/* Header — minimal */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}><Cpu className="w-4 h-4" /></div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-sans">
-                3D Quadcopter Digital Twin
-              </h3>
-              <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                F450 CAD AIRFRAME
-              </span>
-              {/* Flight Mode & Armed State Badges */}
-              <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700">
-                MODE: {flightMode}
-              </span>
-              <span className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border ${
-                isArmed 
-                  ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' 
-                  : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-              }`}>
-                {isArmed ? '● ARMED' : '○ DISARMED'}
-              </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-bold tracking-[0.12em] uppercase" style={{ color: 'var(--text)' }}>3D Digital Twin</span>
+              <span className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full border h-5 inline-flex items-center" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderColor: 'var(--warning-border)' }}>F450 CAD</span>
+              <span className="text-[10px] font-semibold px-2 py-1 rounded-full border h-5 inline-flex items-center hidden sm:inline-flex" style={{ background: 'rgba(2,132,199,0.08)', color: 'var(--accent)', borderColor: 'rgba(2,132,199,0.18)' }}>{flightMode}</span>
+              <span className="text-[10px] font-bold px-2 py-1 rounded-full border h-5 inline-flex items-center" style={{ background: isArmed ? 'var(--critical-bg)' : 'var(--success-bg)', color: isArmed ? 'var(--critical)' : 'var(--success)', borderColor: isArmed ? 'var(--critical-border)' : 'var(--success-border)' }}>{isArmed ? 'ARMED' : 'DISARMED'}</span>
             </div>
-            <p className="text-[11px] text-slate-500 font-mono">
-              Autodesk Inventor CAD Assembly (450mm Diagonal • 30 Solid Components) • Live ArduPilot Sync
-            </p>
+            <p className="text-[11px] mt-0.5 hidden sm:block" style={{ color: 'var(--text-faint)' }}>450 mm • 30 components • Live ArduPilot sync</p>
           </div>
         </div>
-
-        {/* Live Controls & Attitude */}
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-            <Shield className="w-3 h-3 text-sky-500" />
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-              {tel?.flight_mode || 'STABILIZE'} {tel?.is_armed ? '(ARMED)' : '(DISARMED)'}
-            </span>
-          </div>
-
-          <span className="hidden md:inline-flex items-center gap-1 text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
-            <Move className="w-3 h-3 text-sky-500" /> Drag to Rotate
-          </span>
-
-          <button
-            onClick={handleResetView}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <RotateCcw className="w-3 h-3" /> Reset View
-          </button>
+        <div className="flex items-center gap-1.5">
+          <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border" style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}><Move className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Drag to rotate</span>
+          <button onClick={handleResetView} className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border hover:opacity-80 transition-colors" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}><RotateCcw className="w-3 h-3" /> Reset</button>
         </div>
       </div>
 
-      {/* 3D WebGL Canvas */}
-      <div 
-        ref={containerRef} 
-        className="w-full flex-1 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 relative cursor-grab active:cursor-grabbing"
-      />
+      <div ref={containerRef} className="w-full flex-1 rounded-xl overflow-hidden border relative cursor-grab active:cursor-grabbing" style={{ background: 'color-mix(in srgb, var(--bg) 70%, var(--card))', borderColor: 'var(--border)' }} />
 
       {/* Floating Channel RPM HUD overlay */}
       <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono select-none pointer-events-none">

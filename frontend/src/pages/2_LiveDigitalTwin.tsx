@@ -43,103 +43,52 @@ export const LiveDigitalTwinPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-fadeInUp">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-sky-600" />
-            Physics-Informed Digital Twin & Telemetry Comparison
+          <h2 className="text-[15px] font-semibold tracking-tight flex items-center gap-2.5" style={{ color: 'var(--text)' }}>
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}><Cpu className="w-4 h-4" /></span>
+            Digital Twin & Telemetry Comparison
           </h2>
-          <p className="text-xs text-slate-500">
-            Real-time electro-mechanical and lumped-parameter thermal physics equations vs live physical sensor signals
-          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Electro-mechanical + lumped thermal physics vs live sensor signals</p>
         </div>
       </div>
-
-      {/* Physics Equations Header Summary */}
-      <div className="aerospace-card p-4 bg-gradient-to-r from-sky-50 via-white to-sky-50 border-sky-200">
+      <div className="aerospace-card p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs font-mono">
-          <div className="p-2.5 rounded-lg bg-white border border-sky-100 shadow-2xs">
-            <span className="text-[10px] text-slate-400 block mb-0.5">ELECTRICAL POWER</span>
-            <strong className="text-slate-800">P_elec = V_applied × I</strong>
-          </div>
-          <div className="p-2.5 rounded-lg bg-white border border-sky-100 shadow-2xs">
-            <span className="text-[10px] text-slate-400 block mb-0.5">ANGULAR VELOCITY</span>
-            <strong className="text-slate-800">ω = 2π × RPM / 60</strong>
-          </div>
-          <div className="p-2.5 rounded-lg bg-white border border-sky-100 shadow-2xs">
-            <span className="text-[10px] text-slate-400 block mb-0.5">MECHANICAL POWER</span>
-            <strong className="text-slate-800">P_mech = τ_load × ω</strong>
-          </div>
-          <div className="p-2.5 rounded-lg bg-white border border-sky-100 shadow-2xs">
-            <span className="text-[10px] text-slate-400 block mb-0.5">THERMAL ODE</span>
-            <strong className="text-slate-800">C_th(dT/dt) = P_loss - ΔT/R_th</strong>
-          </div>
+          {[
+            ['ELECTRICAL POWER','P_elec = V × I'],
+            ['ANGULAR VELOCITY','ω = 2π · RPM / 60'],
+            ['MECHANICAL POWER','P_mech = τ · ω'],
+            ['THERMAL ODE','C_th dT/dt = P_loss − ΔT/R_th'],
+          ].map(([k,v])=>(
+            <div key={k} className="p-3 rounded-xl border text-center" style={{ background: 'color-mix(in srgb, var(--bg) 65%, var(--card))', borderColor: 'var(--border)' }}>
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase block" style={{ color: 'var(--text-faint)' }}>{k}</span>
+              <strong className="text-[12px] mt-1 block tabular-nums" style={{ color: 'var(--text)' }}>{v}</strong>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Real-time Dynamic Comparison Curves */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* RPM Actual vs Expected */}
-        <div className="aerospace-card p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Rotational Speed: Actual vs Physics Expected
-            </h3>
-            <div className="flex items-center gap-3 text-[11px] font-mono">
-              <span className="text-sky-600 font-bold">ACTUAL</span>
-              <span className="text-slate-400 font-bold">EXPECTED</span>
-            </div>
+        <div className="aerospace-card p-5">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-[11px] font-bold tracking-[0.08em] uppercase" style={{ color: 'var(--text)' }}>Rotational Speed — Actual vs Expected</span>
+            <div className="flex items-center gap-2 text-[11px] font-semibold"><span className="w-2 h-2 rounded-full bg-sky-600" />Actual <span className="w-3 h-0.5 bg-slate-300 rounded" />Expected</div>
           </div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="#94a3b8" fontSize={10} fontStyle="monospace" />
-                <Tooltip />
-                <Line type="monotone" dataKey="actualRpm" stroke="#0284c7" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="expectedRpm" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <div className="h-[200px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" /><XAxis dataKey="time" hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={42} tick={{ fontFamily: 'JetBrains Mono' }} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10 }} /><Line type="monotone" dataKey="actualRpm" stroke="#0284c7" strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedRpm" stroke="#94a3b8" strokeWidth={1.2} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
         </div>
-
-        {/* Temperature Actual vs Expected */}
-        <div className="aerospace-card p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Stator Temperature: Actual vs Lumped Thermal Model
-            </h3>
-            <div className="flex items-center gap-3 text-[11px] font-mono">
-              <span className="text-amber-600 font-bold">ACTUAL</span>
-              <span className="text-slate-400 font-bold">EXPECTED</span>
-            </div>
+        <div className="aerospace-card p-5">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-[11px] font-bold tracking-[0.08em] uppercase" style={{ color: 'var(--text)' }}>Stator Temperature — Actual vs Model</span>
+            <div className="flex items-center gap-2 text-[11px] font-semibold"><span className="w-2 h-2 rounded-full bg-amber-500" />Actual <span className="w-3 h-0.5 bg-slate-300 rounded" />Expected</div>
           </div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="#94a3b8" fontSize={10} fontStyle="monospace" />
-                <Tooltip />
-                <Line type="monotone" dataKey="actualTemp" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="expectedTemp" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <div className="h-[200px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" /><XAxis dataKey="time" hide /><YAxis stroke="var(--text-faint)" fontSize={11} width={42} tick={{ fontFamily: 'JetBrains Mono' }} /><Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10 }} /><Line type="monotone" dataKey="actualTemp" stroke="#d97706" strokeWidth={1.5} dot={false} /><Line type="monotone" dataKey="expectedTemp" stroke="#94a3b8" strokeWidth={1.2} strokeDasharray="4 4" dot={false} /></LineChart></ResponsiveContainer></div>
         </div>
       </div>
 
-      {/* Validated Channels Table */}
-      <div className="aerospace-card p-4">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Currently Validated Sensor Channels (BLDC Physical Testbed)
-            </h3>
-          </div>
+      <div className="aerospace-card p-5">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center gap-2"><Activity className="w-4 h-4" style={{ color: 'var(--success)' }} /><span className="text-[11px] font-bold tracking-[0.08em] uppercase" style={{ color: 'var(--text)' }}>Validated Sensor Channels — BLDC Testbed</span></div>
           <StatusBadge type="VALIDATED" />
         </div>
 

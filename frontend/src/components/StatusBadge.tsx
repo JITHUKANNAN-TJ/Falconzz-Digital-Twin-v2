@@ -9,55 +9,47 @@ interface BadgeProps {
 export const StatusBadge: React.FC<BadgeProps> = ({ type, value, className = '' }) => {
   if (type === 'VALIDATED') {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 ${className}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        VALIDATED ON RIG
+      <span className={`inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] font-semibold tracking-wide border h-5 ${className}`} style={{ background: 'var(--success-bg)', color: 'var(--success)', borderColor: 'var(--success-border)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" style={{ opacity: 0.9 }}></span>
+        VALIDATED
       </span>
     );
   }
-
   if (type === 'PROXY') {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-300 ${className}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] font-semibold tracking-wide border h-5 ${className}`} style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderColor: 'var(--warning-border)' }}>
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-        PROXY / SIMULATED
+        SIMULATED
       </span>
     );
   }
-
   if (type === 'FUTURE') {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-300 ${className}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-        FUTURE MALE-UAV
+      <span className={`inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] font-semibold tracking-wide border h-5 ${className}`} style={{ background: 'rgba(124,58,237,0.08)', color: '#7c3aed', borderColor: '#ddd6fe' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+        FUTURE
       </span>
     );
   }
-
   if (type === 'HEALTH') {
     const band = value || 'HEALTHY';
-    const colorMap: Record<string, string> = {
-      HEALTHY: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      WARNING: 'bg-amber-100 text-amber-800 border-amber-300',
-      DEGRADED: 'bg-orange-100 text-orange-800 border-orange-300',
-      CRITICAL: 'bg-rose-100 text-rose-800 border-rose-300'
+    const map: Record<string, { bg: string; color: string; border: string }> = {
+      HEALTHY: { bg: 'var(--success-bg)', color: 'var(--success)', border: 'var(--success-border)' },
+      WARNING: { bg: 'var(--warning-bg)', color: 'var(--warning)', border: 'var(--warning-border)' },
+      DEGRADED: { bg: 'rgba(234,88,12,0.08)', color: '#ea580c', border: '#fed7aa' },
+      CRITICAL: { bg: 'var(--critical-bg)', color: 'var(--critical)', border: 'var(--critical-border)' }
     };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${colorMap[band] || colorMap.HEALTHY} ${className}`}>
-        {band}
-      </span>
-    );
+    const s = map[band] || map.HEALTHY;
+    return <span className={`inline-flex items-center px-2.5 rounded-full text-[11px] font-bold tracking-wide border h-5 ${className}`} style={{ background: s.bg, color: s.color, borderColor: s.border }}>{band}</span>;
   }
-
   if (type === 'SOURCE') {
     const isHardware = value && value !== 'SIMULATION';
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${isHardware ? 'bg-sky-50 text-sky-700 border-sky-300' : 'bg-slate-100 text-slate-700 border-slate-300'} ${className}`}>
-        <span className={`w-2 h-2 rounded-full ${isHardware ? 'bg-sky-500 animate-ping' : 'bg-slate-400'}`}></span>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] font-bold tracking-wide border h-5 ${className}`} style={{ background: isHardware ? 'rgba(2,132,199,0.08)' : 'color-mix(in srgb, var(--bg) 80%, transparent)', color: isHardware ? 'var(--accent)' : 'var(--text-muted)', borderColor: isHardware ? 'rgba(2,132,199,0.18)' : 'var(--border)' }}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isHardware ? 'bg-sky-500' : 'bg-slate-400'}`}></span>
         {value || 'SIMULATION'}
       </span>
     );
   }
-
   return null;
 };

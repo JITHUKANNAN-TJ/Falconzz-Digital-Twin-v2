@@ -6,12 +6,12 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 
 export const OverviewPage: React.FC = () => {
   const { systemState, history, activeAlerts, theme } = useAppStore();
-  const [timeRange, setTimeRange] = useState<'30s' | '1m' | '5m'>('30s');
+  const [timeRange, setTimeRange] = useState<'5m' | '10m' | '20m'>('5m');
   const [activeTab, setActiveTab] = useState<'rpm' | 'current' | 'temperature' | 'power'>('rpm');
   const isDark = theme === 'dark';
 
   const historySlice = useMemo(() => {
-    const count = timeRange === '30s' ? 30 : 60;
+    const count = timeRange === '5m' ? 60 : timeRange === '10m' ? 120 : 200;
     return history.slice(-count);
   }, [history, timeRange]);
 
@@ -168,7 +168,7 @@ export const OverviewPage: React.FC = () => {
               ))}
             </div>
             <div className="hidden sm:flex rounded-full border p-1 gap-1" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-              {(['30s', '1m', '5m'] as const).map(r => (
+              {(['5m', '10m', '20m'] as const).map(r => (
                 <button
                   key={r}
                   onClick={() => setTimeRange(r as any)}

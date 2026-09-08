@@ -145,73 +145,76 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     // 2. Critical Safety Threshold Violations
-    if (tel.temperature_c > 75) {
+    const tempC = tel.temperature_c ?? 25.0;
+    if (tempC > 75) {
       alerts.push({
         id: 'alert_temp_crit',
         timestamp: now,
         level: 'CRITICAL',
         target: 'MOTOR / STATOR',
         parameter: 'Temperature',
-        measured: `${tel.temperature_c.toFixed(1)} °C`,
+        measured: `${tempC.toFixed(1)} °C`,
         limit: '75.0 °C',
         event: 'Motor Stator Temperature Exceeded Critical Safety Limit',
-        evidence: `Measured ${tel.temperature_c.toFixed(1)} °C vs 75.0 °C safety threshold.`,
+        evidence: `Measured ${tempC.toFixed(1)} °C vs 75.0 °C safety threshold.`,
         action: 'STOP MOTOR OPERATION / FOLLOW SAFE SHUTDOWN PROCEDURE.'
       });
-    } else if (tel.temperature_c > 60) {
+    } else if (tempC > 60) {
       alerts.push({
         id: 'alert_temp_warn',
         timestamp: now,
         level: 'WARNING',
         target: 'MOTOR / STATOR',
         parameter: 'Temperature',
-        measured: `${tel.temperature_c.toFixed(1)} °C`,
+        measured: `${tempC.toFixed(1)} °C`,
         limit: '60.0 °C',
         event: 'Motor Temperature Elevation Detected',
-        evidence: `Measured temperature elevated at ${tel.temperature_c.toFixed(1)} °C.`,
+        evidence: `Measured temperature elevated at ${tempC.toFixed(1)} °C.`,
         action: 'Reduce throttle load and verify air cooling flow.'
       });
     }
 
-    if (tel.vibration_rms_g > 0.45) {
+    const vibG = tel.vibration_rms_g ?? 0.05;
+    if (vibG > 0.45) {
       alerts.push({
         id: 'alert_vib_crit',
         timestamp: now,
         level: 'CRITICAL',
         target: 'PROPULSION IMU',
         parameter: 'Vibration',
-        measured: `${tel.vibration_rms_g.toFixed(3)} g`,
+        measured: `${vibG.toFixed(3)} g`,
         limit: '0.450 g',
         event: 'Excessive Structural / Motor Vibration Magnitude',
-        evidence: `IMU vibration level is ${tel.vibration_rms_g.toFixed(3)} g exceeding 0.450 g limit.`,
+        evidence: `IMU vibration level is ${vibG.toFixed(3)} g exceeding 0.450 g limit.`,
         action: 'STOP OPERATION. Inspect propeller balance, motor bearings and arm mounting.'
       });
-    } else if (tel.vibration_rms_g > 0.25) {
+    } else if (vibG > 0.25) {
       alerts.push({
         id: 'alert_vib_warn',
         timestamp: now,
         level: 'WARNING',
         target: 'PROPULSION IMU',
         parameter: 'Vibration',
-        measured: `${tel.vibration_rms_g.toFixed(3)} g`,
+        measured: `${vibG.toFixed(3)} g`,
         limit: '0.250 g',
         event: 'Elevated Vibration Baseline',
-        evidence: `Vibration reading ${tel.vibration_rms_g.toFixed(3)} g above nominal baseline.`,
+        evidence: `Vibration reading ${vibG.toFixed(3)} g above nominal baseline.`,
         action: 'Check propeller track and mechanical fasteners at next maintenance.'
       });
     }
 
-    if (tel.current_a > 18.0) {
+    const currA = tel.current_a ?? 0.0;
+    if (currA > 18.0) {
       alerts.push({
         id: 'alert_curr_crit',
         timestamp: now,
         level: 'CRITICAL',
         target: 'ESC ELECTRICAL',
         parameter: 'Current',
-        measured: `${tel.current_a.toFixed(2)} A`,
+        measured: `${currA.toFixed(2)} A`,
         limit: '18.00 A',
         event: 'ESC Overcurrent Safety Exceeded',
-        evidence: `Current draw ${tel.current_a.toFixed(2)} A exceeds 18.0 A continuous safe threshold.`,
+        evidence: `Current draw ${currA.toFixed(2)} A exceeds 18.0 A continuous safe threshold.`,
         action: 'Reduce throttle immediately. Inspect for aerodynamic stall or motor short.'
       });
     }
@@ -224,20 +227,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         level: 'WARNING',
         target: '4-MOTOR CLUSTER',
         event: 'Motor Performance Deviation Detected',
-        evidence: `Cross-motor RPM deviation of ${tel.rpm_imbalance_pct.toFixed(0)} RPM between propulsion channels.`,
+        evidence: `Cross-motor RPM deviation of ${(tel.rpm_imbalance_pct || 0).toFixed(0)} RPM between propulsion channels.`,
         action: 'Inspect ESC calibration, propeller condition, and telemetry wiring.'
       });
     }
 
     // 4. Anomaly & ML Fault Prediction Alert
-    if (intel.is_anomaly && intel.predicted_fault !== 'NORMAL') {
+    if (intel.is_anomaly && intel.predicted_fault && intel.predicted_fault !== 'NORMAL') {
       const isHighRisk = intel.anomaly_severity === 'CRITICAL' || intel.fault_severity === 'CRITICAL';
+      const faultName = intel.predicted_fault.replace(/_/g, ' ');
+      const faultConf = (intel.fault_confidence_pct ?? 90).toFixed(0);
       alerts.push({
         id: 'alert_ml_pred',
         timestamp: now,
         level: isHighRisk ? 'CRITICAL' : 'WARNING',
         target: intel.affected_subsystem || 'BLDC PROPULSION',
-        event: `${intel.predicted_fault.replace(/_/g, ' ')} (${intel.fault_confidence_pct.toFixed(0)}% Confidence)`,
+        event: `${faultName} (${faultConf}% Confidence)`,
         evidence: intel.xai_why || 'Telemetry residuals deviate significantly from learned operating baseline.',
         action: intel.xai_recommendation || 'Inspect propulsion subsystem before continued flight.'
       });

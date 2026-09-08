@@ -52,12 +52,13 @@ def run_causal_pipeline_step() -> FullSystemState:
     """
     t_start = time.time()
     
-    # 1. Generate simulated frame (used as fallback if hardware disconnected)
-    sim_packet = telemetry_generator.generate_packet()
+    # 1. Determine if a physical hardware telemetry source is active
+    is_hardware_selected = (hal_manager.active_source != TelemetrySource.SIMULATION)
+    sim_packet = None if is_hardware_selected else telemetry_generator.generate_packet()
     
     # 2. HAL Telemetry Ingestion & Validation
     telemetry: CanonicalTelemetry = hal_manager.get_active_telemetry(sim_packet)
-    is_real = (telemetry.source_type == TelemetrySource.APM_MAVLINK)
+    is_real = (telemetry.source_type != TelemetrySource.SIMULATION)
     
     # 3. Physics-Informed Digital Twin & Residual Calculation
     dt_expected, residuals = residual_engine.compute_twin_and_residuals(telemetry)
@@ -76,14 +77,15 @@ def run_causal_pipeline_step() -> FullSystemState:
         fvec, residuals.composite_residual_score
     )
     
-    # 7. Health Index Computation
+    # 7. Health Index Computation (Zero synthetic wear on real hardware)
+    effective_severity = 0.0 if is_real else (telemetry_generator.scenario_severity * 0.5)
     health_idx, health_band = health_calculator.compute_health(
-        residuals, is_anomaly, anomaly_score, telemetry_generator.scenario_severity * 0.5
+        residuals, is_anomaly, anomaly_score, effective_severity
     )
     
     # 8. RUL Prediction (Quantile Uncertainty Bounds or Insufficient Data flag)
     rul_dict = rul_predictor.predict(
-        fvec, health_idx, telemetry_generator.scenario_severity * 0.5, 
+        fvec, health_idx, effective_severity, 
         is_real_live=is_real, operating_samples=len(buffer_store.state_buffer)
     )
     
@@ -217,8 +219,8 @@ def run_causal_pipeline_step() -> FullSystemState:
         digital_twin=dt_expected,
         residuals=residuals,
         intelligence=intel_state,
-        scenario=telemetry_generator.active_scenario,
-        scenario_severity=telemetry_generator.scenario_severity,
+        scenario=ScenarioType.NORMAL if is_real else telemetry_generator.active_scenario,
+        scenario_severity=0.0 if is_real else telemetry_generator.scenario_severity,
         control_mode=control_manager.active_mode,
         safety_state=safety_st,
         emergency_stop_active=e_stop,

@@ -15,20 +15,35 @@ export const APMConnectionCard: React.FC = () => {
   const [detectedPorts, setDetectedPorts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [showTrace, setShowTrace] = useState<boolean>(false);
+  const [motorConns, setMotorConns] = useState<Record<string, boolean>>({
+    motor_1: true,
+    motor_2: true,
+    motor_3: true,
+    motor_4: true
+  });
 
   const fetchDiagnosticsAndPorts = async () => {
     try {
-      const [d, p] = await Promise.all([
+      const [d, p, mc] = await Promise.all([
         api.getAPMDiagnostics(),
-        api.getSerialPorts()
+        api.getSerialPorts(),
+        api.getMotorConnections()
       ]);
       setDiag(d);
+      if (mc?.connections) {
+        setMotorConns(mc.connections);
+      }
       if (p?.ports && Array.isArray(p.ports)) {
         setDetectedPorts(p.ports);
         if (p.ports.length > 0) {
           const portNames = p.ports.map((item: any) => item.port);
           if (!serialPort || !portNames.includes(serialPort)) {
             setSerialPort(p.ports[0].port);
+            // If CP210x or 3DR telemetry radio detected, default baud rate to 57600
+            const desc = (p.ports[0].description || '').toLowerCase();
+            if (desc.includes('cp210') || desc.includes('radio') || desc.includes('3dr') || desc.includes('telemetry')) {
+              setBaudRate(57600);
+            }
           }
         } else {
           setSerialPort('');
@@ -43,14 +58,20 @@ export const APMConnectionCard: React.FC = () => {
     return () => clearInterval(interval);
   }, [serialPort]);
 
+
   const handleConnect = async () => {
     if (connType === 'USB_SERIAL' && !serialPort) return;
     setLoading(true);
     try {
       const targetStr = connType === 'UDP' ? `udpin:${udpIp}:${udpPort}` : serialPort;
-      await api.connectMAVLink(targetStr, baudRate);
+      const res = await api.connectMAVLink(targetStr, baudRate, connType);
+      if (res?.success || res?.status === 'CONNECTED' || res?.status === 'CONNECTING') {
+        await api.setTelemetrySource('APM_MAVLINK' as any);
+      }
       await fetchDiagnosticsAndPorts();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Failed to connect APM:', err);
+    }
     setLoading(false);
   };
 
@@ -58,8 +79,11 @@ export const APMConnectionCard: React.FC = () => {
     setLoading(true);
     try {
       await api.disconnectMAVLink();
+      await api.setTelemetrySource('SIMULATION' as any);
       await fetchDiagnosticsAndPorts();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Failed to disconnect APM:', err);
+    }
     setLoading(false);
   };
 
@@ -187,13 +211,15 @@ export const APMConnectionCard: React.FC = () => {
             value={baudRate}
             onChange={(e) => setBaudRate(Number(e.target.value))}
             disabled={isConnected || loading || (connType === 'USB_SERIAL' && detectedPorts.length === 0)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500 font-bold"
           >
-            <option value={115200}>115200 (Direct USB Standard)</option>
-            <option value={57600}>57600 (Telemetry Radio)</option>
+            <option value={57600}>57600 (3DR / Sik Telemetry Radio 433/915 MHz)</option>
+            <option value={56000}>56000 (Custom Telemetry Radio)</option>
+            <option value={115200}>115200 (Direct USB Standard / ESP32)</option>
+            <option value={9600}>9600 (Arduino Serial)</option>
+            <option value={38400}>38400 (Legacy Radio)</option>
+            <option value={19200}>19200</option>
             <option value={921600}>921600 (High-Speed Serial)</option>
-            <option value={576000}>576000</option>
-            <option value={38400}>38400</option>
           </select>
         </div>
 
@@ -228,8 +254,55 @@ export const APMConnectionCard: React.FC = () => {
         </div>
       </div>
 
+      {/* APM Motor Hardware Channel Detection Ingress Display */}
+      <div className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2 font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-sans">
+              <Settings2 className="w-3.5 h-3.5 text-sky-600" />
+              APM Motor Hardware Ingress (Automatic Telemetry Link Detection)
+            </span>
+            <p className="text-[10px] text-slate-500 font-sans mt-0.5">
+              Live hardware ingress: When motor cables are plugged in, telemetry displays real-time RPM. Disconnected channels automatically read NOT CONNECTED with zeroed values.
+            </p>
+          </div>
+
+          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-300">
+            AUTO HARDWARE DETECTION ACTIVE
+          </span>
+        </div>
+
+        {/* 4 Motor Channels Read-Only Status */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+          {(['motor_1', 'motor_2', 'motor_3', 'motor_4'] as const).map((mId, idx) => {
+            const isConn = motorConns[mId] !== false;
+            return (
+              <div 
+                key={mId}
+                className={`p-2 rounded border flex items-center justify-between transition-colors ${
+                  isConn
+                    ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 text-rose-800 dark:text-rose-300'
+                }`}
+              >
+                <div>
+                  <div className="font-bold text-[11px]">MOTOR {idx + 1} (CH {idx + 1})</div>
+                  <div className="text-[9px] opacity-75">{isConn ? '● HARDWARE CONNECTED' : '✕ NOT CONNECTED'}</div>
+                </div>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                  isConn ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-rose-100 text-rose-700 border-rose-300'
+                }`}>
+                  {isConn ? 'LIVE' : 'UNPLUGGED'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Real APM Telemetry Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg p-3">
+
         <div className="p-2 bg-white border border-slate-200 rounded">
           <div className="text-[10px] text-slate-400 font-sans">APM STATUS</div>
           <div className={`font-bold ${isConnected ? 'text-emerald-700' : 'text-slate-500'}`}>

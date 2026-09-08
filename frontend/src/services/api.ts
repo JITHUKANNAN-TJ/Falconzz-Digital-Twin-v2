@@ -1,10 +1,43 @@
-import { ScenarioType, TelemetrySource, ControlMode } from '../types/telemetry';
+import { ScenarioType, TelemetrySource, ControlMode, MotorBenchmarkData } from '../types/telemetry';
 
 const API_BASE = '/api';
 
 export const api = {
+  async getMotorBenchmark(): Promise<MotorBenchmarkData> {
+    const res = await fetch(`${API_BASE}/hardware/motor-benchmark`);
+    return res.json();
+  },
+
+  async getMotorConnections(): Promise<{ connections: Record<string, boolean> }> {
+    const res = await fetch(`${API_BASE}/hardware/motor-connections`);
+    return res.json();
+  },
+
+  async setMotorConnection(motor_id: string, is_connected: boolean) {
+    const res = await fetch(`${API_BASE}/hardware/motor-connection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motor_id, is_connected })
+    });
+    return res.json();
+  },
+
+  async setAllMotorsConnection(is_connected: boolean) {
+    const res = await fetch(`${API_BASE}/hardware/motor-connection-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_connected })
+    });
+    return res.json();
+  },
+
   async getLatestTelemetry() {
     const res = await fetch(`${API_BASE}/telemetry/latest`);
+    return res.json();
+  },
+
+  async getMotorsTelemetry() {
+    const res = await fetch(`${API_BASE}/telemetry/motors`);
     return res.json();
   },
 
@@ -160,9 +193,17 @@ export const api = {
     return res.json();
   },
 
+  async connectSerial(port: string, baud_rate = 115200, device_type = 'ESP32') {
+    return this.connectSerialDevice(port, baud_rate, device_type);
+  },
+
   async disconnectSerialDevice(device_type = 'ESP32') {
     const res = await fetch(`${API_BASE}/hardware/serial/disconnect?device_type=${device_type}`, { method: 'POST' });
     return res.json();
+  },
+
+  async disconnectSerial(device_type = 'ESP32') {
+    return this.disconnectSerialDevice(device_type);
   },
 
   async getSafetyStatus() {

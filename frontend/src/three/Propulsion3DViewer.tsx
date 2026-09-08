@@ -205,9 +205,9 @@ export const Propulsion3DViewer: React.FC = () => {
 
       {/* Floating Diagnostics overlay */}
       <div className="absolute bottom-6 left-6 z-10 bg-white/90 backdrop-blur-xs border border-slate-200/90 rounded-md px-2.5 py-1.5 text-[11px] font-mono text-slate-600 shadow-xs flex gap-3">
-        <span>RPM: <strong className="text-slate-900">{systemState?.telemetry.rpm.toFixed(0) || 0}</strong></span>
-        <span>TEMP: <strong className="text-slate-900">{systemState?.telemetry.temperature_c.toFixed(1) || 25}°C</strong></span>
-        <span>VIB: <strong className="text-slate-900">{systemState?.telemetry.vibration_rms_g.toFixed(2) || 0.05}g</strong></span>
+        <span>RPM: <strong className="text-slate-900">{(systemState?.telemetry?.rpm ?? 0).toFixed(0)}</strong></span>
+        <span>TEMP: <strong className="text-slate-900">{(systemState?.telemetry?.temperature_c ?? 25).toFixed(1)}°C</strong></span>
+        <span>VIB: <strong className="text-slate-900">{(systemState?.telemetry?.vibration_rms_g ?? 0.05).toFixed(2)}g</strong></span>
       </div>
     </div>
   );

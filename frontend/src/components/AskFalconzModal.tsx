@@ -65,22 +65,24 @@ export const AskFalconzModal: React.FC = () => {
       return 'Motors 1, 2, and 4 are operating within the nominal learned baseline. Telemetry shows balanced RPM and thermal parameters.';
     }
 
-    // 2. Health & Prediction
-    if (q.includes('health') || q.includes('status')) {
-      return `Overall propulsion health is currently ${intel.health_index.toFixed(1)}% (${intel.health_band}). System trend is ${intel.trend}. Confidence is ${intel.confidence_pct || 94}%.`;
+    // 1. Propulsion Health
+    if (q.includes('health') || q.includes('status') || q.includes('integrity')) {
+      const hIdx = (intel.health_index ?? 100).toFixed(1);
+      return `Overall propulsion health is currently ${hIdx}% (${intel.health_band || 'HEALTHY'}). System trend is ${intel.trend || 'STABLE'}. Confidence is ${intel.confidence_pct || 94}%.`;
     }
 
     if (q.includes('prediction') || q.includes('predict') || q.includes('forecast')) {
-      if (intel.predicted_fault !== 'NORMAL') {
-        return `Degradation prediction: ${intel.predicted_fault.replace(/_/g, ' ')} with ${intel.fault_confidence_pct.toFixed(0)}% model confidence. Contributing features: ${intel.xai_why || 'RPM residual and vibration elevation'}. Recommended action: ${intel.xai_recommendation}. (Note: This is an analytical prediction, not a confirmed hardware failure).`;
+      if (intel.predicted_fault && intel.predicted_fault !== 'NORMAL') {
+        const pFault = intel.predicted_fault.replace(/_/g, ' ');
+        const fConf = (intel.fault_confidence_pct ?? 90).toFixed(0);
+        return `Degradation prediction: ${pFault} with ${fConf}% model confidence. Contributing features: ${intel.xai_why || 'RPM residual and vibration elevation'}. Recommended action: ${intel.xai_recommendation}. (Note: This is an analytical prediction, not a confirmed hardware failure).`;
       }
       return 'Current propulsion behavior is within learned operating baseline. No degradation trend predicted. Recommended action: Continue real-time monitoring.';
     }
 
     // 3. Connection & Link
     if (q.includes('apm') || q.includes('connect') || q.includes('mavlink') || q.includes('link')) {
-      const isLive = tel.connection_status === 'CONNECTED' && tel.heartbeat_received;
-      return `APM Link status: ${tel.connection_status}. Heartbeat: ${tel.heartbeat_received ? 'ACTIVE' : 'OFFLINE'}. Packet rate: ${tel.packet_rate_hz || 0} Hz. Telemetry age: ${tel.telemetry_age_ms !== null ? `${tel.telemetry_age_ms} ms` : 'N/A'}.`;
+      return `APM Link status: ${tel.connection_status || 'DISCONNECTED'}. Heartbeat: ${tel.heartbeat_received ? 'ACTIVE' : 'OFFLINE'}. Packet rate: ${tel.packet_rate_hz || 0} Hz. Telemetry age: ${tel.telemetry_age_ms !== null ? `${tel.telemetry_age_ms} ms` : 'N/A'}.`;
     }
 
     // 4. Alerts & Safety
@@ -102,7 +104,11 @@ export const AskFalconzModal: React.FC = () => {
     }
 
     // Fallback response using actual state
-    return `Current system overview: Health ${intel.health_index.toFixed(0)}%, Telemetry ${tel.source_type}, RPM: ${tel.rpm.toFixed(0)}, Temp: ${tel.temperature_c.toFixed(1)} °C, Vibration: ${tel.vibration_rms_g.toFixed(3)} g. Let me know if you need details on specific motor channels or predictions.`;
+    const hIdx = (intel.health_index ?? 100).toFixed(0);
+    const rpmVal = (tel.rpm ?? 0).toFixed(0);
+    const tempVal = (tel.temperature_c ?? 25).toFixed(1);
+    const vibVal = (tel.vibration_rms_g ?? 0.05).toFixed(3);
+    return `Current system overview: Health ${hIdx}%, Telemetry ${tel.source_type}, RPM: ${rpmVal}, Temp: ${tempVal} °C, Vibration: ${vibVal} g. Let me know if you need details on specific motor channels or predictions.`;
   };
 
   const handleSend = (e?: React.FormEvent) => {

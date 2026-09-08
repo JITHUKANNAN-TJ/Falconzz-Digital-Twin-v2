@@ -68,7 +68,11 @@ export const MaintenanceAdvisoryPage: React.FC = () => {
           </div>
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
             <span className="text-slate-400 block mb-0.5 text-[10px] font-bold">REMAINING LIFE TO OVERHAUL</span>
-            <strong className="text-purple-700 font-mono font-bold">{intel.rul_hours.toFixed(1)} Operating Hours</strong>
+            <strong className="text-purple-700 font-mono font-bold">
+              {intel.rul_hours !== null && intel.rul_hours !== undefined
+                ? `${intel.rul_hours.toFixed(1)} Operating Hours`
+                : 'PENDING SUFFICIENT DATA'}
+            </strong>
           </div>
         </div>
       </div>

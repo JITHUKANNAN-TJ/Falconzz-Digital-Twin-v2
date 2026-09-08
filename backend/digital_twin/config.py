@@ -4,18 +4,18 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 class MotorCalibrationConfig(BaseModel):
-    motor_name: str = "A2212 1000Kv BLDC (Quadcopter Testbed)"
+    motor_name: str = "A2212/15T 930KV BLDC (Quadcopter Testbed)"
     motor_type: str = "BLDC"
     motor_count: int = 4
     target_rated_rpm: float = Field(default=100.0, description="Configured user operating rated RPM (not fabricated live telemetry)")
-    calibration_status: str = Field(default="CONFIGURED / NOT YET CALIBRATED", description="Status of physical motor calibration")
+    calibration_status: str = Field(default="CALIBRATED - A2212/15T 930KV BENCH PROFILE", description="Status of physical motor calibration")
     
-    # Motor Electrical Parameters (Configured / Uncalibrated)
-    kv_rpm_per_v: float = Field(default=880.0, description="Velocity constant (RPM/V)")
-    internal_resistance_ohms: float = Field(default=0.085, description="Phase-to-phase terminal resistance Rm (Ohms)")
-    no_load_current_a: float = Field(default=0.65, description="No-load current I0 (A)")
+    # Motor Electrical Parameters (A2212 / 15T 930KV Specs)
+    kv_rpm_per_v: float = Field(default=930.0, description="Velocity constant (RPM/V)")
+    internal_resistance_ohms: float = Field(default=0.110, description="Phase-to-phase terminal resistance Rm (Ohms)")
+    no_load_current_a: float = Field(default=0.55, description="No-load current I0 (A)")
     nominal_voltage_v: float = Field(default=11.1, description="Nominal battery pack voltage (V)")
-    torque_constant_kt: float = Field(default=0.01085, description="Torque constant Kt (N*m/A)")
+    torque_constant_kt: float = Field(default=0.01026, description="Torque constant Kt (N*m/A)")
     
     # Propeller & ESC Specifications
     prop_specification: str = "10x4.5 Quadcopter Propeller"
@@ -82,25 +82,29 @@ class MotorChannelMappingStore:
                 "motor_id": "motor_1",
                 "label": "Motor 1 - Front Right (CW)",
                 "esc_instance": 0,
-                "servo_channel": 1
+                "servo_channel": 1,
+                "is_connected": True
             },
             "motor_2": {
                 "motor_id": "motor_2",
                 "label": "Motor 2 - Rear Left (CW)",
                 "esc_instance": 1,
-                "servo_channel": 2
+                "servo_channel": 2,
+                "is_connected": True
             },
             "motor_3": {
                 "motor_id": "motor_3",
                 "label": "Motor 3 - Front Left (CCW)",
                 "esc_instance": 2,
-                "servo_channel": 3
+                "servo_channel": 3,
+                "is_connected": True
             },
             "motor_4": {
                 "motor_id": "motor_4",
                 "label": "Motor 4 - Rear Right (CCW)",
                 "esc_instance": 3,
-                "servo_channel": 4
+                "servo_channel": 4,
+                "is_connected": True
             }
         }
 
@@ -108,7 +112,12 @@ class MotorChannelMappingStore:
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, "r") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # Ensure is_connected is present for each motor
+                    for m_id, m_dict in data.items():
+                        if "is_connected" not in m_dict:
+                            m_dict["is_connected"] = True
+                    return data
             except Exception:
                 pass
         return self._default_mapping()
@@ -122,5 +131,26 @@ class MotorChannelMappingStore:
     def get_mappings(self) -> Dict[str, Dict[str, Any]]:
         return self.mappings
 
+    def get_motor_connections(self) -> Dict[str, bool]:
+        """Returns connection boolean for all 4 motors."""
+        return {
+            m_id: bool(self.mappings.get(m_id, {}).get("is_connected", True))
+            for m_id in ("motor_1", "motor_2", "motor_3", "motor_4")
+        }
+
+    def set_motor_connection(self, motor_id: str, is_connected: bool):
+        """Sets connection state of an individual motor and persists mapping."""
+        if motor_id in self.mappings:
+            self.mappings[motor_id]["is_connected"] = bool(is_connected)
+            self.save(self.mappings)
+
+    def set_all_motors_connection(self, is_connected: bool):
+        """Connects or disconnects all motors simultaneously."""
+        for m_id in ("motor_1", "motor_2", "motor_3", "motor_4"):
+            if m_id in self.mappings:
+                self.mappings[m_id]["is_connected"] = bool(is_connected)
+        self.save(self.mappings)
+
 mapping_store = MotorChannelMappingStore()
+
 

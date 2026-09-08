@@ -41,17 +41,85 @@ export interface MotorTelemetry {
   label: string;
   esc_instance?: number | null;
   servo_channel?: number | null;
+  is_connected?: boolean;
+  connection_status?: 'CONNECTED' | 'DISCONNECTED';
+  disconnection_reason?: string | null;
+  motor_model?: string;
+  propeller?: string;
+  kv_rating?: number;
   live_rpm?: number | null;
+  rpm?: number | null;
   rated_rpm: number;
   voltage_v?: number | null;
   current_a?: number | null;
   power_w?: number | null;
+  thrust_g?: number | null;
+  g_per_watt?: number | null;
+  efficiency_pct?: number | null;
   temperature_c?: number | null;
   vibration_rms_g?: number | null;
   throttle_pct?: number | null;
   torque_nm?: number | null;
+  in_cruise_efficiency_zone?: boolean;
   status: 'REAL' | 'SIMULATION' | 'UNAVAILABLE' | 'PROXY';
   source_message: string;
+}
+
+export interface MotorBenchmarkPoint {
+  throttle_pct: number;
+  voltage_v: number;
+  current_a: number;
+  power_w: number;
+  rpm: number;
+  thrust_g: number;
+  g_per_watt: number;
+  mechanical_power_w: number;
+  electrical_eff_pct: number;
+  motor_temp_c: number;
+  vibration_g: number;
+  in_cruise_efficiency_zone: boolean;
+}
+
+export interface MotorBenchmarkProfile {
+  key: string;
+  name: string;
+  battery_cells: number;
+  nominal_voltage_v: number;
+  propeller: string;
+  optimal: boolean;
+  points: MotorBenchmarkPoint[];
+}
+
+export interface MotorSpec {
+  model: string;
+  kv_rating: number;
+  stator_diameter_mm: number;
+  stator_height_mm: number;
+  poles: number;
+  slots: number;
+  internal_resistance_ohm: number;
+  no_load_current_a: number;
+  max_continuous_current_a: number;
+  max_power_w: number;
+  weight_g: number;
+  shaft_diameter_mm: number;
+  recommended_esc_a: number;
+  recommended_battery: string;
+  recommended_propeller: string;
+  peak_efficiency_zone: {
+    min_throttle_pct: number;
+    max_throttle_pct: number;
+    optimal_current_range_a: [number, number];
+    optimal_thrust_range_g: [number, number];
+    optimal_efficiency_g_per_w: [number, number];
+    electrical_efficiency_pct: [number, number];
+  };
+}
+
+export interface MotorBenchmarkData {
+  motor_spec: MotorSpec;
+  test_methodology: string;
+  profiles: Record<string, MotorBenchmarkProfile>;
 }
 
 export interface PipelineStageStatus {
@@ -75,7 +143,12 @@ export interface CanonicalTelemetry {
   // Quadcopter Aggregate Propulsion Channels
   total_current_a?: number | null;
   total_power_w?: number | null;
+  total_thrust_g?: number | null;
+  avg_efficiency_pct?: number | null;
+  avg_g_per_watt?: number | null;
   avg_rpm?: number | null;
+  connected_motors_count?: number;
+  total_motors_count?: number;
   rpm_imbalance_pct?: number | null;
   current_imbalance_pct?: number | null;
   temp_imbalance_c?: number | null;
@@ -85,12 +158,58 @@ export interface CanonicalTelemetry {
   battery_voltage_v?: number | null;
   battery_current_a?: number | null;
   battery_remaining_pct?: number | null;
+  battery_consumed_mah?: number | null;
+  battery_temp_c?: number | null;
+  cell_voltages?: number[];
+  
+  // 3D Flight Attitude & Dynamics
+  roll_deg?: number;
+  pitch_deg?: number;
+  yaw_deg?: number;
+  rollspeed_deg_s?: number;
+  pitchspeed_deg_s?: number;
+  yawspeed_deg_s?: number;
+  
+  // IMU & Vibration Spectrum
+  vibration_x_g?: number;
+  vibration_y_g?: number;
+  vibration_z_g?: number;
+  clipping_0?: number;
+  clipping_1?: number;
+  clipping_2?: number;
+  
+  // Global Position & Navigation
+  latitude?: number | null;
+  longitude?: number | null;
+  relative_altitude_m?: number;
+  climb_rate_mps?: number;
+  heading_deg?: number;
+  satellites_visible?: number;
+  gps_fix_type?: number;
+  
+  // Flight Controller Status & Radio RC Inputs
+  flight_mode?: string;
+  is_armed?: boolean;
+  rc_throttle?: number;
+  rc_roll?: number;
+  rc_pitch?: number;
+  rc_yaw?: number;
+  rc_rssi?: number;
+  rc_channels?: Record<string, number>;
+  statustext_log?: Array<{ timestamp: number; severity: number; text: string }>;
   
   // Heartbeat & Telemetry Liveness
   heartbeat_received?: boolean;
   packet_rate_hz?: number;
   packet_loss_count?: number;
   telemetry_age_ms?: number | null;
+  
+  // Telemetry Radio Link Metrics
+  radio_rssi?: number | null;
+  radio_remrssi?: number | null;
+  radio_noise?: number | null;
+  radio_remnoise?: number | null;
+  radio_txbuf?: number | null;
   
   // Primary Channels
   throttle_pct: number;
@@ -105,6 +224,8 @@ export interface CanonicalTelemetry {
   vibration_rms_g: number;
   load_pct: number;
   ambient_temperature_c: number;
+  altitude_m?: number;
+  airspeed_mps?: number;
   
   // Future Aero-Piston Channels
   cht_c?: number | null;

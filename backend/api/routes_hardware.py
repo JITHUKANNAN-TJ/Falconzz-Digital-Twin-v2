@@ -8,8 +8,16 @@ from backend.hardware.serial_driver import esp32_serial_driver, arduino_serial_d
 from backend.hardware.wifi_driver import esp32_wifi_driver
 from backend.digital_twin.config import calibration_store, MotorCalibrationConfig, mapping_store
 from backend.hardware.mavlink.telemetry_mapper import telemetry_mapper
+from simulator.telemetry_generator import telemetry_generator
 
 router = APIRouter(prefix="/hardware", tags=["Hardware & Connectivity"])
+
+class MotorConnectionRequest(BaseModel):
+    motor_id: str
+    is_connected: bool
+
+class MotorConnectionAllRequest(BaseModel):
+    is_connected: bool
 
 class MAVLinkConnectRequest(BaseModel):
     connection_string: str = "COM3"  # e.g., "COM3", "/dev/ttyUSB0", "udpin:0.0.0.0:14550"
@@ -134,6 +142,7 @@ def connect_mavlink(req: MAVLinkConnectRequest):
     return {
         "success": success,
         "status": mavlink_manager.get_status(),
+        "error": mavlink_manager.last_error,
         "diagnostics": mavlink_manager.get_detailed_diagnostics()
     }
 
@@ -149,12 +158,20 @@ def connect_serial_device(req: SerialConnectRequest):
         success = esp32_serial_driver.connect(req.port, req.baud_rate)
         if success:
             hal_manager.set_source(TelemetrySource.ESP32_SERIAL)
-        return {"success": success, "status": esp32_serial_driver.get_status()}
+        return {
+            "success": success,
+            "status": esp32_serial_driver.get_status(),
+            "error": esp32_serial_driver.last_error
+        }
     else:
         success = arduino_serial_driver.connect(req.port, req.baud_rate)
         if success:
             hal_manager.set_source(TelemetrySource.ARDUINO_SERIAL)
-        return {"success": success, "status": arduino_serial_driver.get_status()}
+        return {
+            "success": success,
+            "status": arduino_serial_driver.get_status(),
+            "error": arduino_serial_driver.last_error
+        }
 
 @router.post("/serial/disconnect")
 def disconnect_serial_device(device_type: str = "ESP32"):
@@ -177,5 +194,63 @@ def stop_wifi_server():
     esp32_wifi_driver.stop_server()
     hal_manager.set_source(TelemetrySource.SIMULATION)
     return {"status": "STOPPED"}
+
+@router.get("/motor-connections")
+def get_motor_connections():
+    """Returns connection state of all 4 motors."""
+    return {
+        "connections": mapping_store.get_motor_connections()
+    }
+
+@router.post("/motor-connection")
+def set_motor_connection(req: MotorConnectionRequest):
+    """Connect or disconnect an individual motor."""
+    mapping_store.set_motor_connection(req.motor_id, req.is_connected)
+    telemetry_generator.set_motor_connection(req.motor_id, req.is_connected)
+    return {
+        "success": True,
+        "motor_id": req.motor_id,
+        "is_connected": req.is_connected,
+        "connections": mapping_store.get_motor_connections()
+    }
+
+@router.post("/motor-connection-all")
+def set_motor_connection_all(req: MotorConnectionAllRequest):
+    """Connect or disconnect all motors simultaneously."""
+    mapping_store.set_all_motors_connection(req.is_connected)
+    telemetry_generator.set_all_motors_connection(req.is_connected)
+    return {
+        "success": True,
+        "is_connected": req.is_connected,
+        "connections": mapping_store.get_motor_connections()
+    }
+
+
+@router.get("/motor-benchmark")
+def get_motor_benchmark():
+    """Returns full empirical and physics-calibrated benchmark curves for A2212/15T 930KV."""
+    import json
+    from pathlib import Path
+    benchmark_file = Path(__file__).parent.parent.parent / "data" / "a2212_15t_930kv_benchmark.json"
+    if benchmark_file.exists():
+        with open(benchmark_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    raise HTTPException(status_code=404, detail="Benchmark dataset not found")
+
+@router.get("/motor-benchmark/csv")
+def get_motor_benchmark_csv():
+    """Returns the empirical CSV dataset for A2212/15T 930KV as an attachment."""
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    csv_file = Path(__file__).parent.parent.parent / "data" / "a2212_15t_930kv_efficiency_data.csv"
+    if csv_file.exists():
+        return FileResponse(
+            str(csv_file),
+            media_type="text/csv",
+            filename="a2212_15t_930kv_efficiency_data.csv"
+        )
+    raise HTTPException(status_code=404, detail="Benchmark CSV not found")
+
+
 
 

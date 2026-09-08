@@ -1,0 +1,30 @@
+{
+  "motor_1": {
+    "motor_id": "motor_1",
+    "label": "Motor 1 - Front Right (CW)",
+    "esc_instance": 0,
+    "servo_channel": 1,
+    "is_connected": true
+  },
+  "motor_2": {
+    "motor_id": "motor_2",
+    "label": "Motor 2 - Rear Left (CW)",
+    "esc_instance": 1,
+    "servo_channel": 2,
+    "is_connected": true
+  },
+  "motor_3": {
+    "motor_id": "motor_3",
+    "label": "Motor 3 - Front Left (CCW)",
+    "esc_instance": 2,
+    "servo_channel": 3,
+    "is_connected": true
+  },
+  "motor_4": {
+    "motor_id": "motor_4",
+    "label": "Motor 4 - Rear Right (CCW)",
+    "esc_instance": 3,
+    "servo_channel": 4,
+    "is_connected": false
+  }
+}

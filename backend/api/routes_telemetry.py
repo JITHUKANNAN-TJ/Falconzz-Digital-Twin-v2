@@ -27,6 +27,82 @@ def get_latest_telemetry():
         raise HTTPException(status_code=404, detail="No telemetry available yet")
     return latest.telemetry
 
+@router.get("/motors")
+def get_motors_telemetry():
+    """Returns dedicated per-motor live telemetry and connection status.
+    If a motor is connected, returns full live telemetry and automatically updated metrics.
+    If not connected, explicitly flags connection_status: 'NOT CONNECTED' with 0 / offline values.
+    """
+    latest = buffer_store.get_latest_state()
+    if not latest or not latest.telemetry:
+        raise HTTPException(status_code=404, detail="No telemetry available yet")
+    motors = latest.telemetry.motors or {}
+    formatted = {}
+    for m_id, m in motors.items():
+        is_conn = bool(m.is_connected)
+        formatted[m_id] = {
+            "motor_id": m.motor_id,
+            "label": m.label,
+            "is_connected": is_conn,
+            "connection_status": "CONNECTED" if is_conn else "NOT CONNECTED",
+            "telemetry_updated": is_conn,
+            "live_rpm": m.live_rpm if is_conn else 0.0,
+            "current_a": m.current_a if is_conn else 0.0,
+            "voltage_v": m.voltage_v if is_conn else 0.0,
+            "power_w": m.power_w if is_conn else 0.0,
+            "thrust_g": m.thrust_g if is_conn else 0.0,
+            "g_per_watt": m.g_per_watt if is_conn else 0.0,
+            "temperature_c": m.temperature_c if is_conn else None,
+            "vibration_rms_g": m.vibration_rms_g if is_conn else 0.0,
+            "throttle_pct": m.throttle_pct if is_conn else 0.0,
+            "esc_instance": m.esc_instance,
+            "servo_channel": m.servo_channel,
+            "motor_model": m.motor_model,
+            "propeller": m.propeller,
+            "status": m.status if is_conn else "OFFLINE",
+            "disconnection_reason": m.disconnection_reason if not is_conn else None
+        }
+    return {
+        "timestamp": latest.telemetry.timestamp,
+        "source_type": latest.telemetry.source_type,
+        "connected_count": sum(1 for m in formatted.values() if m["is_connected"]),
+        "total_count": len(formatted),
+        "motors": formatted
+    }
+
+@router.get("/motors/{motor_id}")
+def get_single_motor_telemetry(motor_id: str):
+    """Returns dedicated live telemetry for an individual motor (motor_1, motor_2, motor_3, or motor_4)."""
+    latest = buffer_store.get_latest_state()
+    if not latest or not latest.telemetry or not latest.telemetry.motors:
+        raise HTTPException(status_code=404, detail="No telemetry available yet")
+    if motor_id not in latest.telemetry.motors:
+        raise HTTPException(status_code=404, detail=f"Motor '{motor_id}' not found in telemetry stream")
+    m = latest.telemetry.motors[motor_id]
+    is_conn = bool(m.is_connected)
+    return {
+        "motor_id": m.motor_id,
+        "label": m.label,
+        "is_connected": is_conn,
+        "connection_status": "CONNECTED" if is_conn else "NOT CONNECTED",
+        "telemetry_updated": is_conn,
+        "live_rpm": m.live_rpm if is_conn else 0.0,
+        "current_a": m.current_a if is_conn else 0.0,
+        "voltage_v": m.voltage_v if is_conn else 0.0,
+        "power_w": m.power_w if is_conn else 0.0,
+        "thrust_g": m.thrust_g if is_conn else 0.0,
+        "g_per_watt": m.g_per_watt if is_conn else 0.0,
+        "temperature_c": m.temperature_c if is_conn else None,
+        "vibration_rms_g": m.vibration_rms_g if is_conn else 0.0,
+        "throttle_pct": m.throttle_pct if is_conn else 0.0,
+        "esc_instance": m.esc_instance,
+        "servo_channel": m.servo_channel,
+        "motor_model": m.motor_model,
+        "propeller": m.propeller,
+        "status": m.status if is_conn else "OFFLINE",
+        "disconnection_reason": m.disconnection_reason if not is_conn else None
+    }
+
 @router.get("/history")
 def get_telemetry_history(limit: int = 100):
     states = buffer_store.get_recent_states(limit)

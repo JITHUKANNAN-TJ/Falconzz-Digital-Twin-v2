@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Zap, Activity, Info, BarChart2 } from 'lucide-react';
+import { Cpu, Activity } from 'lucide-react';
 import { useAppStore } from '../state/store';
 import { StatusBadge } from '../components/StatusBadge';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
@@ -15,32 +15,31 @@ export const LiveDigitalTwinPage: React.FC = () => {
 
   const chartData = history.map((h, i) => ({
     time: i,
-    actualRpm: h.telemetry.rpm,
-    expectedRpm: h.digital_twin.expected_rpm,
-    actualTemp: h.telemetry.temperature_c,
-    expectedTemp: h.digital_twin.expected_temperature_c,
-    actualCurrent: h.telemetry.current_a,
-    expectedCurrent: h.digital_twin.expected_current_a,
-    actualEff: h.telemetry.efficiency_pct,
-    expectedEff: h.digital_twin.expected_efficiency_pct
+    actualRpm: h.telemetry?.rpm ?? 0,
+    expectedRpm: h.digital_twin?.expected_rpm ?? 0,
+    actualTemp: h.telemetry?.temperature_c ?? 25,
+    expectedTemp: h.digital_twin?.expected_temperature_c ?? 25,
+    actualCurrent: h.telemetry?.current_a ?? 0,
+    expectedCurrent: h.digital_twin?.expected_current_a ?? 0,
+    actualEff: h.telemetry?.efficiency_pct ?? 0,
+    expectedEff: h.digital_twin?.expected_efficiency_pct ?? 0
   }));
 
-  const validatedChannels = [
-    { name: 'Rotational Speed', actual: `${tel.rpm.toFixed(0)} RPM`, expected: `${dt.expected_rpm.toFixed(0)} RPM`, residual: `${res.residual_rpm > 0 ? '+' : ''}${res.residual_rpm.toFixed(0)} RPM`, status: Math.abs(res.residual_rpm) > 300 ? 'DEVIATING' : 'MATCHED' },
-    { name: 'Stator Temperature', actual: `${tel.temperature_c.toFixed(1)} °C`, expected: `${dt.expected_temperature_c.toFixed(1)} °C`, residual: `${res.residual_temperature_c > 0 ? '+' : ''}${res.residual_temperature_c.toFixed(1)} °C`, status: res.residual_temperature_c > 12 ? 'HIGH RESIDUAL' : 'MATCHED' },
-    { name: 'Electrical Current', actual: `${tel.current_a.toFixed(2)} A`, expected: `${dt.expected_current_a.toFixed(2)} A`, residual: `${res.residual_current_a > 0 ? '+' : ''}${res.residual_current_a.toFixed(2)} A`, status: res.residual_current_a > 3 ? 'OVER-CURRENT' : 'MATCHED' },
-    { name: 'Applied Electrical Power', actual: `${tel.power_elec_w.toFixed(1)} W`, expected: `${dt.expected_power_elec_w.toFixed(1)} W`, residual: `${res.residual_power_w > 0 ? '+' : ''}${res.residual_power_w.toFixed(1)} W`, status: 'MATCHED' },
-    { name: 'Mechanical Output Power', actual: `${tel.power_mech_w.toFixed(1)} W`, expected: `${dt.expected_power_mech_w.toFixed(1)} W`, residual: `${(tel.power_mech_w - dt.expected_power_mech_w).toFixed(1)} W`, status: 'MATCHED' },
-    { name: 'System Efficiency', actual: `${tel.efficiency_pct.toFixed(1)} %`, expected: `${dt.expected_efficiency_pct.toFixed(1)} %`, residual: `${res.residual_efficiency_pct > 0 ? '+' : ''}${res.residual_efficiency_pct.toFixed(1)} %`, status: res.residual_efficiency_pct < -10 ? 'EFFICIENCY LOSS' : 'MATCHED' },
-    { name: 'Vibration Magnitude', actual: `${tel.vibration_rms_g.toFixed(3)} g`, expected: `${dt.expected_vibration_rms_g.toFixed(3)} g`, residual: `${res.residual_vibration_g > 0 ? '+' : ''}${res.residual_vibration_g.toFixed(3)} g`, status: res.residual_vibration_g > 0.25 ? 'ELEVATED' : 'MATCHED' },
-  ];
+  const resRpm = res.residual_rpm ?? 0;
+  const resTemp = res.residual_temperature_c ?? 0;
+  const resCurr = res.residual_current_a ?? 0;
+  const resPwr = res.residual_power_w ?? 0;
+  const resEff = res.residual_efficiency_pct ?? 0;
+  const resVib = res.residual_vibration_g ?? 0;
 
-  const proxyFutureChannels = [
-    { name: 'Cylinder Head Temp (CHT)', value: tel.cht_c !== null ? `${tel.cht_c} °C` : 'UNAVAILABLE (AERO-PISTON REQUIRED)', badge: 'FUTURE' as const, note: 'Mapped to winding thermal model analog in proxy simulation' },
-    { name: 'Exhaust Gas Temp (EGT)', value: tel.egt_c !== null ? `${tel.egt_c} °C` : 'UNAVAILABLE (AERO-PISTON REQUIRED)', badge: 'FUTURE' as const, note: 'Engine exhaust gas temperature monitoring' },
-    { name: 'Engine Oil Pressure', value: tel.oil_pressure_psi !== null ? `${tel.oil_pressure_psi} PSI` : 'UNAVAILABLE (AERO-PISTON REQUIRED)', badge: 'FUTURE' as const, note: 'Lubrication loop pressure for future piston engine integration' },
-    { name: 'Fuel Mass Flow', value: tel.fuel_flow_gph !== null ? `${tel.fuel_flow_gph} GPH` : 'UNAVAILABLE (AERO-PISTON REQUIRED)', badge: 'FUTURE' as const, note: 'Gravimetric/volumetric fuel consumption rate' },
-    { name: 'Alternator Bus Current', value: tel.alternator_current_a !== null ? `${tel.alternator_current_a} A` : 'UNAVAILABLE (AERO-PISTON REQUIRED)', badge: 'FUTURE' as const, note: 'Electrical accessory generation subsystem' },
+  const validatedChannels = [
+    { name: 'Rotational Speed', actual: `${(tel.rpm ?? 0).toFixed(0)} RPM`, expected: `${(dt.expected_rpm ?? 0).toFixed(0)} RPM`, residual: `${resRpm > 0 ? '+' : ''}${resRpm.toFixed(0)} RPM`, status: Math.abs(resRpm) > 300 ? 'DEVIATING' : 'MATCHED' },
+    { name: 'Stator Temperature', actual: `${(tel.temperature_c ?? 25).toFixed(1)} °C`, expected: `${(dt.expected_temperature_c ?? 25).toFixed(1)} °C`, residual: `${resTemp > 0 ? '+' : ''}${resTemp.toFixed(1)} °C`, status: resTemp > 12 ? 'HIGH RESIDUAL' : 'MATCHED' },
+    { name: 'Electrical Current', actual: `${(tel.current_a ?? 0).toFixed(2)} A`, expected: `${(dt.expected_current_a ?? 0).toFixed(2)} A`, residual: `${resCurr > 0 ? '+' : ''}${resCurr.toFixed(2)} A`, status: resCurr > 3 ? 'OVER-CURRENT' : 'MATCHED' },
+    { name: 'Applied Electrical Power', actual: `${(tel.power_elec_w ?? 0).toFixed(1)} W`, expected: `${(dt.expected_power_elec_w ?? 0).toFixed(1)} W`, residual: `${resPwr > 0 ? '+' : ''}${resPwr.toFixed(1)} W`, status: 'MATCHED' },
+    { name: 'Mechanical Output Power', actual: `${(tel.power_mech_w ?? 0).toFixed(1)} W`, expected: `${(dt.expected_power_mech_w ?? 0).toFixed(1)} W`, residual: `${((tel.power_mech_w ?? 0) - (dt.expected_power_mech_w ?? 0)).toFixed(1)} W`, status: 'MATCHED' },
+    { name: 'System Efficiency', actual: `${(tel.efficiency_pct ?? 0).toFixed(1)} %`, expected: `${(dt.expected_efficiency_pct ?? 0).toFixed(1)} %`, residual: `${resEff > 0 ? '+' : ''}${resEff.toFixed(1)} %`, status: resEff < -10 ? 'EFFICIENCY LOSS' : 'MATCHED' },
+    { name: 'Vibration Magnitude', actual: `${(tel.vibration_rms_g ?? 0.05).toFixed(3)} g`, expected: `${(dt.expected_vibration_rms_g ?? 0.05).toFixed(3)} g`, residual: `${resVib > 0 ? '+' : ''}${resVib.toFixed(3)} g`, status: resVib > 0.25 ? 'ELEVATED' : 'MATCHED' },
   ];
 
   return (
@@ -175,32 +174,6 @@ export const LiveDigitalTwinPage: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Future / Proxy Aero-Piston Channels */}
-      <div className="aerospace-card p-4">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-purple-600" />
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Future MALE-UAV Aero-Piston Architecture Channels
-            </h3>
-          </div>
-          <StatusBadge type="FUTURE" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {proxyFutureChannels.map((p, idx) => (
-            <div key={idx} className="p-3 rounded-lg bg-slate-50 border border-slate-200/90 text-xs">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-slate-800">{p.name}</span>
-                <StatusBadge type={p.badge} />
-              </div>
-              <div className="font-mono text-slate-500 font-semibold mb-1">{p.value}</div>
-              <p className="text-[11px] text-slate-400 font-sans">{p.note}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import time
+import json
 import threading
 import logging
 import collections
-from typing import Optional, Dict, Any, List, Deque
+from typing import Optional, Dict, Any, List, Deque, Tuple
 from backend.telemetry.schema import ConnectionStatus
 from backend.hardware.mavlink.mavlink_parser import mavlink_parser
 from backend.hardware.mavlink.telemetry_mapper import telemetry_mapper
@@ -32,9 +33,11 @@ class MAVLinkConnectionManager:
         # Diagnostic & Liveness State
         self.last_packet_time: float = 0.0
         self.last_heartbeat_time: float = 0.0
+        self.last_flight_telemetry_time: float = 0.0
         self.packets_received: int = 0
         self.packets_dropped: int = 0
         self.last_seq: Optional[int] = None
+        self.last_seq_by_source: Dict[Tuple[int, int], int] = {}
         self.last_error: Optional[str] = None
         
         # APM Identity & Protocol
@@ -48,6 +51,15 @@ class MAVLinkConnectionManager:
         
         # Rolling message trace (last 50 decoded frames)
         self.recent_messages: Deque[Dict[str, Any]] = collections.deque(maxlen=50)
+        
+        # 3DR / SiK Telemetry Radio Status
+        self.radio_rssi: Optional[float] = None
+        self.radio_remrssi: Optional[float] = None
+        self.radio_noise: Optional[float] = None
+        self.radio_remnoise: Optional[float] = None
+        self.radio_txbuf: Optional[float] = None
+        self.last_radio_time: float = 0.0
+
 
     @staticmethod
     def list_available_ports() -> List[Dict[str, str]]:
@@ -130,13 +142,37 @@ class MAVLinkConnectionManager:
             self.running = True
             self.thread = threading.Thread(target=self._read_loop, daemon=True)
             self.thread.start()
+            self.heartbeat_thread = threading.Thread(target=self._heartbeat_and_stream_loop, daemon=True)
+            self.heartbeat_thread.start()
             self.connection_status = ConnectionStatus.CONNECTED
             self.last_error = None
             return True
         except Exception as e:
-            self.last_error = str(e)
+            err_str = str(e)
+            if "PermissionError" in err_str or "Access is denied" in err_str or "13" in err_str:
+                conflicts = []
+                try:
+                    import psutil
+                    for p in psutil.process_iter(['name']):
+                        n = (p.info.get('name') or '').lower()
+                        if 'missionplanner' in n:
+                            conflicts.append("Mission Planner")
+                        elif 'qgroundcontrol' in n:
+                            conflicts.append("QGroundControl")
+                        elif 'arduino' in n:
+                            conflicts.append("Arduino IDE")
+                except Exception:
+                    pass
+                if conflicts:
+                    self.last_error = f"Port {self.connection_string} is in use by {', '.join(set(conflicts))}. Please disconnect in that app or close it."
+                else:
+                    self.last_error = f"Port {self.connection_string} is in use by another application. Please close Mission Planner, QGC, or Arduino Serial Monitor."
+            elif "FileNotFoundError" in err_str or "could not open port" in err_str:
+                self.last_error = f"Port {self.connection_string} not found or device disconnected."
+            else:
+                self.last_error = f"Could not connect to {self.connection_string}: {err_str}"
             self.connection_status = ConnectionStatus.ERROR
-            logger.warning(f"APM connection failed on {self.connection_string}: {e}")
+            logger.warning(f"APM connection failed on {self.connection_string}: {self.last_error}")
             return False
 
     def disconnect(self):
@@ -149,7 +185,70 @@ class MAVLinkConnectionManager:
             self.connection = None
         self.connection_status = ConnectionStatus.DISCONNECTED
 
+    def _heartbeat_and_stream_loop(self):
+        """
+        Sends periodic GCS Heartbeats (1 Hz) and requests MAVLink telemetry streams from the Flight Controller.
+        Rates are optimized for 57600 baud telemetry radio bandwidth (2-4 Hz) to prevent air buffer saturation.
+        """
+        from pymavlink import mavutil
+        last_req = 0.0
+        while self.running and self.connection:
+            try:
+                now = time.time()
+                # 1. GCS Heartbeat (required for APM to stream data back)
+                self.connection.mav.heartbeat_send(
+                    mavutil.mavlink.MAV_TYPE_GCS,
+                    mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                    0, 0, 0
+                )
+                # 2. Request data streams every 5.0s
+                if now - last_req >= 5.0:
+                    fc_sys = self.system_id if (self.system_id and self.system_id != 51) else 1
+                    target_comp = 0
+                    
+                    # Bandwidth-safe stream rates for 57600 SiK Telemetry Radio
+                    streams = [
+                        (mavutil.mavlink.MAV_DATA_STREAM_EXTRA1, 4),        # Attitude & dynamics
+                        (mavutil.mavlink.MAV_DATA_STREAM_EXTRA2, 4),        # VFR_HUD (throttle, airspeed, heading)
+                        (mavutil.mavlink.MAV_DATA_STREAM_RAW_CONTROLLER, 4),# SERVO_OUTPUT_RAW
+                        (mavutil.mavlink.MAV_DATA_STREAM_RAW_SENSORS, 2),   # IMU, Scaled Pressure
+                        (mavutil.mavlink.MAV_DATA_STREAM_EXTENDED_STATUS, 2),# SYS_STATUS, Battery
+                        (mavutil.mavlink.MAV_DATA_STREAM_RC_CHANNELS, 2),   # Pilot sticks
+                        (mavutil.mavlink.MAV_DATA_STREAM_POSITION, 2),      # GPS & Altitudes
+                        (mavutil.mavlink.MAV_DATA_STREAM_EXTRA3, 2),
+                    ]
+                    for stream_id, rate in streams:
+                        try:
+                            self.connection.mav.request_data_stream_send(
+                                fc_sys, target_comp, stream_id, rate, 1
+                            )
+                        except Exception:
+                            pass
+                                
+                    # MAVLink 2 message intervals (4 Hz = 250,000 microseconds)
+                    for msg_id in (30, 36, 74, 1, 147, 241):  # ATTITUDE, SERVO_OUTPUT_RAW, VFR_HUD, SYS_STATUS, BATTERY_STATUS, VIBRATION
+                        try:
+                            self.connection.mav.command_long_send(
+                                fc_sys, 0,
+                                mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+                                0,
+                                msg_id,
+                                250000,
+                                0, 0, 0, 0, 0
+                            )
+                        except Exception:
+                            pass
+                                
+                    last_req = now
+            except Exception as e:
+                logger.debug(f"Stream request error: {e}")
+            time.sleep(1.0)
+
     def _read_loop(self):
+        """
+        Ingests MAVLink packets directly from PyMAVLink without stealing or corrupting serial bytes.
+        Maintains independent sequence numbering per transmitter source (sys, comp).
+        """
         while self.running and self.connection:
             try:
                 msg = self.connection.recv_match(blocking=False)
@@ -162,29 +261,45 @@ class MAVLinkConnectionManager:
                     
                     # Capture Protocol & System Identity
                     header = getattr(msg, "_header", None)
-                    if header:
-                        msg_src_sys = getattr(header, "srcSystem", None)
-                        msg_src_comp = getattr(header, "srcComponent", None)
-                        msg_seq = getattr(header, "seq", None)
-                        
-                        if msg_src_sys is not None:
-                            self.system_id = msg_src_sys
-                        if msg_src_comp is not None:
-                            self.component_id = msg_src_comp
-                            
-                        # Packet loss estimation based on sequence number jumps
-                        if msg_seq is not None:
-                            if self.last_seq is not None:
-                                expected_seq = (self.last_seq + 1) % 256
-                                if msg_seq != expected_seq:
-                                    diff = (msg_seq - expected_seq) % 256
-                                    if diff < 50:
-                                        self.packets_dropped += diff
-                            self.last_seq = msg_seq
+                    msg_src_sys = getattr(header, "srcSystem", None) if header else None
+                    msg_src_comp = getattr(header, "srcComponent", None) if header else None
+                    msg_seq = getattr(header, "seq", None) if header else None
+                    
+                    # Per-source sequence loss tracking (separates radio dongle seq from autopilot seq)
+                    if msg_src_sys is not None and msg_seq is not None:
+                        src_key = (msg_src_sys, msg_src_comp or 0)
+                        if src_key in self.last_seq_by_source:
+                            expected_seq = (self.last_seq_by_source[src_key] + 1) % 256
+                            if msg_seq != expected_seq:
+                                diff = (msg_seq - expected_seq) % 256
+                                if diff < 50:
+                                    self.packets_dropped += diff
+                        self.last_seq_by_source[src_key] = msg_seq
                             
                     msg_type = msg.get_type()
                     if msg_type == "HEARTBEAT":
-                        self.last_heartbeat_time = now
+                        if msg_src_sys not in (0, 51):
+                            self.last_heartbeat_time = now
+                            self.last_flight_telemetry_time = now
+                            if msg_src_sys is not None:
+                                self.system_id = msg_src_sys
+                            if msg_src_comp is not None:
+                                self.component_id = msg_src_comp
+                    elif msg_type in ("RADIO", "RADIO_STATUS"):
+                        self.last_radio_time = now
+                        self.radio_rssi = float(getattr(msg, "rssi", 0))
+                        self.radio_remrssi = float(getattr(msg, "remrssi", 0))
+                        self.radio_noise = float(getattr(msg, "noise", 0))
+                        self.radio_remnoise = float(getattr(msg, "remnoise", 0))
+                        self.radio_txbuf = float(getattr(msg, "txbuf", 100))
+                    else:
+                        # Flight controller message
+                        if msg_src_sys not in (0, 51):
+                            self.last_flight_telemetry_time = now
+                            if msg_src_sys is not None:
+                                self.system_id = msg_src_sys
+                            if msg_src_comp is not None:
+                                self.component_id = msg_src_comp
                     
                     parsed = mavlink_parser.parse_message(msg)
                     if parsed:
@@ -195,16 +310,17 @@ class MAVLinkConnectionManager:
                         self.recent_messages.appendleft({
                             "timestamp": round(now, 3),
                             "msg_type": msg_type,
-                            "sys_id": self.system_id or 1,
-                            "comp_id": self.component_id or 1,
+                            "sys_id": msg_src_sys or self.system_id or 1,
+                            "comp_id": msg_src_comp or self.component_id or 1,
                             "fields": fields
                         })
                 else:
-                    time.sleep(0.005)
+                    # Buffer is temporarily empty; yield briefly to avoid busy wait
+                    time.sleep(0.002)
             except Exception as e:
                 self.last_error = str(e)
-                self.connection_status = ConnectionStatus.ERROR
-                time.sleep(0.05)
+                time.sleep(0.02)
+
 
     def compute_message_rate(self) -> float:
         """Calculates current telemetry message reception rate in Hz."""
@@ -264,11 +380,18 @@ class MAVLinkConnectionManager:
             "packets_dropped": self.packets_dropped,
             "last_message_timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.last_packet_time)) if self.last_packet_time > 0 else "N/A",
             "last_error": self.last_error,
+            "radio_link": {
+                "active": ((now - self.last_radio_time) < 4.0) if self.last_radio_time > 0 else False,
+                "rssi": self.radio_rssi,
+                "remrssi": self.radio_remrssi,
+                "txbuf": self.radio_txbuf
+            },
             "field_provenance": telemetry_mapper.get_field_provenance(),
             "message_discovery": telemetry_mapper.get_message_discovery_table(),
             "field_availability": telemetry_mapper.get_field_availability_matrix(),
             "recent_messages": list(self.recent_messages)[:25]
         }
+
 
 mavlink_manager = MAVLinkConnectionManager()
 

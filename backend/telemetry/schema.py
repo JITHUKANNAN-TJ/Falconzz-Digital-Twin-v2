@@ -79,15 +79,25 @@ class MotorTelemetry(BaseModel):
     label: str = ""
     esc_instance: Optional[int] = None
     servo_channel: Optional[int] = None
-    live_rpm: Optional[float] = None  # Strictly real measured RPM or None
-    rated_rpm: float = 100.0  # Configured rated parameter (not fabricated live telemetry)
+    is_connected: bool = False
+    connection_status: str = "DISCONNECTED"  # "CONNECTED" or "DISCONNECTED"
+    disconnection_reason: Optional[str] = None  # e.g., "ESC Signal Lost", "Unplugged / Disconnected"
+    motor_model: str = "A2212/15T 930KV"
+    propeller: str = "1045 (10x4.5)"
+    kv_rating: float = 930.0  # A2212/15T 930KV specification
+    live_rpm: Optional[float] = None  # Real measured / derived live RPM
+    rated_rpm: float = 930.0  # Operating rated parameter
     voltage_v: Optional[float] = None
     current_a: Optional[float] = None
     power_w: Optional[float] = None
+    thrust_g: Optional[float] = None
+    g_per_watt: Optional[float] = None
+    efficiency_pct: Optional[float] = None
     temperature_c: Optional[float] = None
     vibration_rms_g: Optional[float] = None
     throttle_pct: Optional[float] = None
     torque_nm: Optional[float] = None
+    in_cruise_efficiency_zone: bool = False
     status: SensorChannelBadge = SensorChannelBadge.UNAVAILABLE
     source_message: str = "UNAVAILABLE"
 
@@ -111,7 +121,12 @@ class CanonicalTelemetry(BaseModel):
     # Quadcopter Propulsion Aggregate Metrics (Derived only from available valid telemetry)
     total_current_a: Optional[float] = None
     total_power_w: Optional[float] = None
+    total_thrust_g: Optional[float] = None
+    avg_efficiency_pct: Optional[float] = None
+    avg_g_per_watt: Optional[float] = None
     avg_rpm: Optional[float] = None
+    connected_motors_count: int = 0
+    total_motors_count: int = 4
     rpm_imbalance_pct: Optional[float] = None
     current_imbalance_pct: Optional[float] = None
     temp_imbalance_c: Optional[float] = None
@@ -137,12 +152,58 @@ class CanonicalTelemetry(BaseModel):
     battery_voltage_v: Optional[float] = None
     battery_current_a: Optional[float] = None
     battery_remaining_pct: Optional[float] = None
+    battery_consumed_mah: Optional[float] = None
+    battery_temp_c: Optional[float] = None
+    cell_voltages: List[float] = Field(default_factory=list)
+    
+    # 3D Flight Attitude & Dynamics (from ATTITUDE)
+    roll_deg: float = 0.0
+    pitch_deg: float = 0.0
+    yaw_deg: float = 0.0
+    rollspeed_deg_s: float = 0.0
+    pitchspeed_deg_s: float = 0.0
+    yawspeed_deg_s: float = 0.0
+    
+    # IMU & Vibration Spectrum (from VIBRATION / RAW_IMU)
+    vibration_x_g: float = 0.0
+    vibration_y_g: float = 0.0
+    vibration_z_g: float = 0.0
+    clipping_0: int = 0
+    clipping_1: int = 0
+    clipping_2: int = 0
+    
+    # Global Position & Navigation (from GLOBAL_POSITION_INT / GPS_RAW_INT)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    relative_altitude_m: float = 0.0
+    climb_rate_mps: float = 0.0
+    heading_deg: float = 0.0
+    satellites_visible: int = 0
+    gps_fix_type: int = 0
+    
+    # Flight Controller Status & Radio RC Inputs (from HEARTBEAT / RC_CHANNELS)
+    flight_mode: str = "STABILIZE"
+    is_armed: bool = False
+    rc_throttle: float = 1000.0
+    rc_roll: float = 1500.0
+    rc_pitch: float = 1500.0
+    rc_yaw: float = 1500.0
+    rc_rssi: float = 255.0
+    rc_channels: Dict[str, float] = Field(default_factory=dict)
+    statustext_log: List[Dict[str, Any]] = Field(default_factory=list)
     
     # Heartbeat & Telemetry Metadata
     telemetry_age_ms: Optional[float] = None
     packet_rate_hz: float = 0.0
     packet_loss_count: int = 0
     heartbeat_received: bool = False
+    
+    # Telemetry Radio Link Metrics (from SiK / 3DR RADIO and RADIO_STATUS)
+    radio_rssi: Optional[float] = None
+    radio_remrssi: Optional[float] = None
+    radio_noise: Optional[float] = None
+    radio_remnoise: Optional[float] = None
+    radio_txbuf: Optional[float] = None
     
     # Future MALE-UAV Aero-Piston Channels (Explicitly tagged as UNAVAILABLE/FUTURE)
     cht_c: Optional[float] = Field(default=None, description="Cylinder Head Temperature - Unavailable on BLDC rig")

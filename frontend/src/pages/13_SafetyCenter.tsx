@@ -23,11 +23,16 @@ export const SafetyCenterPage: React.FC = () => {
 
   const isEmergency = safetyStatus?.emergency_stop_latched || systemState?.safety_state === 'EMERGENCY';
 
+  const telRpm = systemState?.telemetry?.rpm ?? 0;
+  const telCurr = systemState?.telemetry?.current_a ?? 0;
+  const telTemp = systemState?.telemetry?.temperature_c ?? 25;
+  const telVib = systemState?.telemetry?.vibration_rms_g ?? 0.05;
+
   const hardLimits = [
-    { limit: 'Maximum RPM Limit', value: '7,500 RPM', current: `${systemState?.telemetry.rpm.toFixed(0) || 0} RPM`, status: (systemState?.telemetry.rpm || 0) > 7500 ? 'VIOLATED' : 'SAFE' },
-    { limit: 'Maximum Phase Current', value: '38.0 A', current: `${systemState?.telemetry.current_a.toFixed(1) || 0} A`, status: (systemState?.telemetry.current_a || 0) > 38 ? 'VIOLATED' : 'SAFE' },
-    { limit: 'Maximum Stator Winding Temp', value: '85.0 °C', current: `${systemState?.telemetry.temperature_c.toFixed(1) || 25} °C`, status: (systemState?.telemetry.temperature_c || 25) > 85 ? 'VIOLATED' : 'SAFE' },
-    { limit: 'Maximum Vibration Threshold', value: '12.0 g RMS', current: `${systemState?.telemetry.vibration_rms_g.toFixed(2) || 0.05} g`, status: (systemState?.telemetry.vibration_rms_g || 0) > 12 ? 'VIOLATED' : 'SAFE' },
+    { limit: 'Maximum RPM Limit', value: '7,500 RPM', current: `${telRpm.toFixed(0)} RPM`, status: telRpm > 7500 ? 'VIOLATED' : 'SAFE' },
+    { limit: 'Maximum Phase Current', value: '38.0 A', current: `${telCurr.toFixed(1)} A`, status: telCurr > 38 ? 'VIOLATED' : 'SAFE' },
+    { limit: 'Maximum Stator Winding Temp', value: '85.0 °C', current: `${telTemp.toFixed(1)} °C`, status: telTemp > 85 ? 'VIOLATED' : 'SAFE' },
+    { limit: 'Maximum Vibration Threshold', value: '12.0 g RMS', current: `${telVib.toFixed(2)} g`, status: telVib > 12 ? 'VIOLATED' : 'SAFE' },
     { limit: 'Stale Data Watchdog Timeout', value: '2.0 seconds', current: '< 0.5s stream lag', status: 'SAFE' }
   ];
 

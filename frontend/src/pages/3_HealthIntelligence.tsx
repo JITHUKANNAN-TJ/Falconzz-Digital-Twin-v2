@@ -14,18 +14,22 @@ export const HealthIntelligencePage: React.FC = () => {
 
   const healthData = history.map((h, i) => ({
     time: i,
-    health: h.intelligence.health_index,
-    anomaly: h.intelligence.anomaly_score,
-    compositeRes: h.residuals.composite_residual_score
+    health: h.intelligence?.health_index ?? 100,
+    anomaly: h.intelligence?.anomaly_score ?? 0,
+    compositeRes: h.residuals?.composite_residual_score ?? 0
   }));
 
   const residualHeatmap = [
-    { label: 'Normalized Stator Temp Residual', value: res.norm_residual_temp, unit: 'σ', status: Math.abs(res.norm_residual_temp) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_temp) > 1.8 ? 'WARNING' : 'NORMAL' },
-    { label: 'Normalized Vibration Residual', value: res.norm_residual_vibration, unit: 'σ', status: Math.abs(res.norm_residual_vibration) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_vibration) > 1.8 ? 'WARNING' : 'NORMAL' },
-    { label: 'Normalized Phase Current Residual', value: res.norm_residual_current, unit: 'σ', status: Math.abs(res.norm_residual_current) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_current) > 1.8 ? 'WARNING' : 'NORMAL' },
-    { label: 'Normalized RPM Deviation', value: res.norm_residual_rpm, unit: 'σ', status: Math.abs(res.norm_residual_rpm) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_rpm) > 1.8 ? 'WARNING' : 'NORMAL' },
-    { label: 'Normalized Efficiency Loss', value: res.norm_residual_efficiency, unit: 'σ', status: Math.abs(res.norm_residual_efficiency) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_efficiency) > 1.8 ? 'WARNING' : 'NORMAL' }
+    { label: 'Normalized Stator Temp Residual', value: res.norm_residual_temp ?? 0, unit: 'σ', status: Math.abs(res.norm_residual_temp ?? 0) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_temp ?? 0) > 1.8 ? 'WARNING' : 'NORMAL' },
+    { label: 'Normalized Vibration Residual', value: res.norm_residual_vibration ?? 0, unit: 'σ', status: Math.abs(res.norm_residual_vibration ?? 0) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_vibration ?? 0) > 1.8 ? 'WARNING' : 'NORMAL' },
+    { label: 'Normalized Phase Current Residual', value: res.norm_residual_current ?? 0, unit: 'σ', status: Math.abs(res.norm_residual_current ?? 0) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_current ?? 0) > 1.8 ? 'WARNING' : 'NORMAL' },
+    { label: 'Normalized RPM Deviation', value: res.norm_residual_rpm ?? 0, unit: 'σ', status: Math.abs(res.norm_residual_rpm ?? 0) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_rpm ?? 0) > 1.8 ? 'WARNING' : 'NORMAL' },
+    { label: 'Normalized Efficiency Loss', value: res.norm_residual_efficiency ?? 0, unit: 'σ', status: Math.abs(res.norm_residual_efficiency ?? 0) > 3 ? 'CRITICAL' : Math.abs(res.norm_residual_efficiency ?? 0) > 1.8 ? 'WARNING' : 'NORMAL' }
   ];
+
+  const healthIndex = intel.health_index ?? 100;
+  const anomalyScore = intel.anomaly_score ?? 0;
+  const compResScore = res.composite_residual_score ?? 0;
 
   return (
     <div className="space-y-4">
@@ -44,21 +48,21 @@ export const HealthIntelligencePage: React.FC = () => {
         <div className="aerospace-card p-4">
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs font-semibold text-slate-500 uppercase">Composite Health Score</span>
-            <StatusBadge type="HEALTH" value={intel.health_band} />
+            <StatusBadge type="HEALTH" value={intel.health_band || 'HEALTHY'} />
           </div>
           <div className="text-3xl font-bold font-mono text-slate-900 my-1">
-            {intel.health_index.toFixed(1)}%
+            {healthIndex.toFixed(1)}%
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
             <div
               className={`h-full transition-all duration-300 ${
-                intel.health_index >= 90
+                healthIndex >= 90
                   ? 'bg-emerald-500'
-                  : intel.health_index >= 70
+                  : healthIndex >= 70
                   ? 'bg-amber-500'
                   : 'bg-rose-500'
               }`}
-              style={{ width: `${intel.health_index}%` }}
+              style={{ width: `${healthIndex}%` }}
             />
           </div>
         </div>
@@ -71,10 +75,10 @@ export const HealthIntelligencePage: React.FC = () => {
             </span>
           </div>
           <div className="text-3xl font-bold font-mono text-slate-900 my-1">
-            {intel.anomaly_score.toFixed(1)}
+            {anomalyScore.toFixed(1)}
           </div>
           <p className="text-[11px] text-slate-500">
-            Temporal Hysteresis Count: <strong className="font-mono text-slate-800">{intel.anomaly_hysteresis_count} / 5</strong>
+            Temporal Hysteresis Count: <strong className="font-mono text-slate-800">{intel.anomaly_hysteresis_count ?? 0} / 5</strong>
           </p>
         </div>
 
@@ -84,7 +88,7 @@ export const HealthIntelligencePage: React.FC = () => {
             <span className="text-[10px] font-mono text-slate-400">EUCLIDEAN Z-SPACE</span>
           </div>
           <div className="text-3xl font-bold font-mono text-slate-900 my-1">
-            {res.composite_residual_score.toFixed(2)}σ
+            {compResScore.toFixed(2)}σ
           </div>
           <p className="text-[11px] text-slate-500">
             Anomaly Threshold: <strong className="font-mono text-slate-800">2.20σ</strong>

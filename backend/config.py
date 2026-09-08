@@ -6,9 +6,9 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api"
     
-    # Telemetry Streaming
+    # Telemetry Streaming — enlarged to support 20m graph window at 2Hz (20*60*2=2400)
     TELEMETRY_HZ: float = 2.0  # 2 Hz base update rate
-    TELEMETRY_BUFFER_SIZE: int = 2000
+    TELEMETRY_BUFFER_SIZE: int = 5000
     
     # Safety Limits (Hard Hardware Interlocks)
     MAX_RPM: float = 7500.0

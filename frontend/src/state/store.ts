@@ -104,7 +104,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSystemState(state);
       setHistory((prev) => {
         const next = [...prev, state];
-        return next.length > 60 ? next.slice(-60) : next;
+        // Keep up to 3000 points ≈ 25m at 2Hz to support 5m/10m/20m windows
+        return next.length > 3000 ? next.slice(-3000) : next;
       });
     });
 

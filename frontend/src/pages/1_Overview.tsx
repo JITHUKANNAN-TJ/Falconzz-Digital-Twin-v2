@@ -11,8 +11,25 @@ export const OverviewPage: React.FC = () => {
   const isDark = theme === 'dark';
 
   const historySlice = useMemo(() => {
-    const count = timeRange === '5m' ? 60 : timeRange === '10m' ? 120 : 200;
-    return history.slice(-count);
+    // True time-window filtering + decimation for 5m/10m/20m
+    const windowSec = timeRange === '5m' ? 300 : timeRange === '10m' ? 600 : 1200;
+    const now = Date.now() / 1000;
+    // If history has timestamps, filter by time; fallback to count
+    let filtered = history;
+    if (history.length > 0 && history[0]?.telemetry?.timestamp) {
+      filtered = history.filter(h => now - (h.telemetry.timestamp ?? now) < windowSec + 2);
+      if (filtered.length === 0) filtered = history;
+    } else {
+      const count = timeRange === '5m' ? 600 : timeRange === '10m' ? 1200 : 2400;
+      filtered = history.slice(-count);
+    }
+    // Decimate to ≤400 points for smooth AreaChart performance
+    const maxPoints = 400;
+    if (filtered.length > maxPoints) {
+      const step = Math.ceil(filtered.length / maxPoints);
+      filtered = filtered.filter((_, i) => i % step === 0);
+    }
+    return filtered;
   }, [history, timeRange]);
 
   if (!systemState) {
@@ -32,13 +49,18 @@ export const OverviewPage: React.FC = () => {
   const isConnected = tel.connection_status === 'CONNECTED';
   const critical = activeAlerts.find(a => a.level === 'CRITICAL');
 
-  const chartData = historySlice.map(h => ({
-    time: h.telemetry?.rpm ?? 0,
-    rpm: h.telemetry?.rpm ?? 0,
-    current: h.telemetry?.current_a ?? 0,
-    temperature: h.telemetry?.temperature_c ?? 25,
-    power: h.telemetry?.power_elec_w ?? 0,
-  }));
+  const chartData = historySlice.map(h => {
+    const ts = h.telemetry?.timestamp ?? Date.now() / 1000;
+    const d = new Date(ts * 1000);
+    return {
+      time: d.toLocaleTimeString([], { minute: '2-digit', second: '2-digit' }),
+      timeLabel: d.toLocaleTimeString([], { minute: '2-digit', second: '2-digit' }),
+      rpm: h.telemetry?.rpm ?? 0,
+      current: h.telemetry?.current_a ?? 0,
+      temperature: h.telemetry?.temperature_c ?? 25,
+      power: h.telemetry?.power_elec_w ?? 0,
+    };
+  });
 
   const getMotor = (key: 'motor_1' | 'motor_2' | 'motor_3' | 'motor_4', idx: number) => {
     const m: any = motors[key];
@@ -185,16 +207,21 @@ export const OverviewPage: React.FC = () => {
         <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-              <XAxis dataKey="time" hide />
-              <YAxis stroke="var(--text-faint)" fontSize={11} width={40} tick={{ fontFamily: 'JetBrains Mono' }} />
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="timeLabel" tick={{ fontSize: 10, fill: 'var(--text-faint)' }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} interval="preserveStartEnd" minTickGap={40} />
+              <YAxis stroke="var(--text-faint)" fontSize={11} width={44} tick={{ fontFamily: 'JetBrains Mono' }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
                 cursor={{ stroke: 'var(--border)' }}
+                labelStyle={{ color: 'var(--text-muted)', fontSize: 11 }}
               />
               <Area type="monotone" dataKey={activeTab} stroke={isDark ? '#fafafa' : '#0a0a0a'} strokeWidth={1.5} fill={isDark ? '#262626' : '#f5f5f5'} fillOpacity={1} dot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
+          <div className="flex justify-between text-[10px] mt-1 px-1" style={{ color: 'var(--text-faint)' }}>
+            <span>{timeRange} window • {chartData.length} points</span>
+            <span className="hidden sm:inline">Live {activeTab} • decimated to ≤400 pts</span>
+          </div>
         </div>
       </div>
     </div>

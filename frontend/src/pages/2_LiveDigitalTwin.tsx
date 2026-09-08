@@ -33,22 +33,6 @@ export const LiveDigitalTwinPage: React.FC = () => {
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Measured vs physics — residuals in real time</p>
       </div>
 
-      <div className="aerospace-card p-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          {[
-            ['P_elec = V × I', 'Electrical'],
-            ['ω = 2π·RPM/60', 'Angular'],
-            ['P_mech = τ·ω', 'Mechanical'],
-            ['C dT/dt = P − ΔT/R', 'Thermal'],
-          ].map(([eq, label]) => (
-            <div key={label} className="p-3 rounded-md border text-center" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-              <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</div>
-              <div className="font-mono text-xs mt-1" style={{ color: 'var(--text)' }}>{eq}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="aerospace-card p-5">
           <div className="flex justify-between items-center mb-3">
